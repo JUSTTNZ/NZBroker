@@ -116,7 +116,7 @@ export default function DashboardPage() {
             style={{ animationDelay: `${i * 0.1}s` }}
           >
             <h4 className="text-sm font-semibold mb-3">{symbol}</h4>
-            <div className="w-full h-24 rounded-lg overflow-hidden">
+            <div className="w-full h-48 rounded-lg overflow-hidden">
               <MiniSymbolChart symbol={symbol} />
             </div>
           </Card>

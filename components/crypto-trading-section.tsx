@@ -1,7 +1,7 @@
 "use client"
 
 import { Card } from "@/components/ui/card"
-
+import { MiniChart } from "./mini-chart"
 export function CryptoTradingSection() {
   return (
     <section className="py-16 md:py-24">
@@ -28,35 +28,9 @@ export function CryptoTradingSection() {
 
           {/* Mini Charts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* BTC Mini Chart */}
-            <Card className="glass-dark overflow-hidden h-[300px]">
-              <iframe
-                src="https://s.tradingview.com/embed-widget/mini-chart/?symbol=BTCUSD&interval=D&timezone=Etc/UTC&theme=dark&locale=en&copyrightYear=2026"
-                className="w-full h-full border-0"
-                allowFullScreen
-                allow="clipboard-write; web-share"
-              ></iframe>
-            </Card>
-
-            {/* XRP Mini Chart */}
-            <Card className="glass-dark overflow-hidden h-[300px]">
-              <iframe
-                src="https://s.tradingview.com/embed-widget/mini-chart/?symbol=XRPUSD&interval=D&timezone=Etc/UTC&theme=dark&locale=en&copyrightYear=2026"
-                className="w-full h-full border-0"
-                allowFullScreen
-                allow="clipboard-write; web-share"
-              ></iframe>
-            </Card>
-
-            {/* ADA Mini Chart */}
-            <Card className="glass-dark overflow-hidden h-[300px]">
-              <iframe
-                src="https://s.tradingview.com/embed-widget/mini-chart/?symbol=ADAUSD&interval=D&timezone=Etc/UTC&theme=dark&locale=en&copyrightYear=2026"
-                className="w-full h-full border-0"
-                allowFullScreen
-                allow="clipboard-write; web-share"
-              ></iframe>
-            </Card>
+            <MiniChart symbol="BTCUSD" />
+            <MiniChart symbol="ETHUSD" />
+            <MiniChart symbol="LTCUSD" />
           </div>
         </div>
       </div>
