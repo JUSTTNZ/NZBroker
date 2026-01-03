@@ -10,7 +10,7 @@ const plans = [
     price: "$0",
     period: "Forever",
     description: "Perfect for beginners",
-    features: ["$10,000 Demo Account", "Basic Charts", "Email Support", "Community Access"],
+    features: ["$10,000 Demo Account", "Duration: 9 Days", "Basic Support", ],
     current: true,
   },
   {
@@ -20,11 +20,11 @@ const plans = [
     description: "For serious traders",
     features: [
       "$50,000 Demo Account",
-      "Advanced Charts",
-      "Priority Email Support",
-      "Trading Signals",
-      "Copy Trading Access",
-      "Risk Management Tools",
+      "Duration: 15 Days",
+      "Priority Support",
+      // "Trading Signals",
+      // "Copy Trading Access",
+      // "Risk Management Tools",
     ],
     popular: true,
   },
@@ -35,12 +35,13 @@ const plans = [
     description: "For professionals",
     features: [
       "Unlimited Demo Account",
-      "All Pro Features",
-      "24/7 Phone Support",
-      "Personal Account Manager",
-      "Exclusive Webinars",
-      "API Access",
-      "Custom Alerts",
+  
+      "Duration: 30 Days",
+      " 24/7 Premium Support",
+      // "Personal Account Manager",
+      // "Exclusive Webinars",
+      // "API Access",
+      // "Custom Alerts",
     ],
   },
 ]
@@ -57,7 +58,7 @@ export default function UpgradePlanPage() {
         {plans.map((plan) => (
           <Card
             key={plan.name}
-            className={`p-8 relative border-2 transition-all ${
+            className={`p-5 relative border-2 transition-all ${
               plan.popular
                 ? "border-primary bg-primary/10 scale-105"
                 : plan.current
@@ -71,15 +72,15 @@ export default function UpgradePlanPage() {
               </div>
             )}
 
-            <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-            <p className="text-muted-foreground text-sm mb-6">{plan.description}</p>
+            <h3 className="text-xl font-bold ">{plan.name}</h3>
+            <p className="text-muted-foreground text-sm ">{plan.description}</p>
 
-            <div className="mb-6">
+            <div className="">
               <span className="text-4xl font-bold">{plan.price}</span>
               <span className="text-muted-foreground text-sm ml-2">{plan.period}</span>
             </div>
 
-            <ul className="space-y-4 mb-8">
+            <ul className="space-y-4 ">
               {plan.features.map((feature) => (
                 <li key={feature} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
