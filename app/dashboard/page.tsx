@@ -8,7 +8,7 @@ import { ScrollingTicker } from "@/components/scrolling-ticker"
 import { AdvancedChartWidget, MiniSymbolChart, MarketOverviewWidget } from "@/components/tradingview-widgets"
 
 export default function DashboardPage() {
-  const [userName, setUserName] = useState("Trader")
+  const [userName, setUserName] = useState("Nz")
   const [accountType, setAccountType] = useState("demo")
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export default function DashboardPage() {
     if (authToken) {
       try {
         const token = JSON.parse(authToken)
-        setUserName(token.fullName || "Trader")
+        setUserName(token.fullName || "NZ")
       } catch (e) {
         console.log("[v0] Failed to parse auth token")
       }
@@ -53,7 +53,7 @@ export default function DashboardPage() {
             style={{ animationDelay: `${i * 0.1}s` }}
           >
             <p className="text-xs md:text-sm text-muted-foreground mb-2">{stat.label}</p>
-            <p className="text-[clamp(1.5rem,5vw,2rem)] font-bold text-foreground font-mono tabular-nums group-hover:scale-105 transition-transform">
+            <p className="text-[clamp(1.3rem,2vw,2rem)] font-bold text-foreground font-mono tabular-nums group-hover:scale-105 transition-transform">
               {stat.value}
             </p>
             <p className={`text-xs ${stat.color} mt-2`}>{stat.subtext}</p>
