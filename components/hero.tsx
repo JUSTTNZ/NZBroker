@@ -31,7 +31,7 @@ export function Hero() {
           <div className="inline-block">
             <div className="px-4 py-2 rounded-full bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/30 backdrop-blur-sm">
               <span className="text-sm font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                ✨ Welcome to Professional Trading
+                Welcome to Professional Trading
               </span>
             </div>
           </div>

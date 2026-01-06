@@ -16,21 +16,21 @@ export function MarketOverview() {
           </div>
 
           {/* Tabs */}
-          <div className="flex flex-wrap justify-center gap-3">
-            {["indices", "forex", "stocks", "crypto"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2 rounded-lg font-semibold transition-all capitalize ${
-                  activeTab === tab
-                    ? "bg-gradient-to-r from-primary to-accent text-white glow-purple"
-                    : "bg-card text-muted-foreground hover:text-foreground border border-border/40"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+<div className="flex flex-nowrap justify-center gap-2 sm:gap-3 overflow-x-auto">
+  {["indices", "forex", "stocks", "crypto"].map((tab) => (
+    <button
+      key={tab}
+      onClick={() => setActiveTab(tab)}
+      className={`px-4 py-2 sm:px-6 sm:py-2 text-sm rounded-lg font-semibold transition-all capitalize whitespace-nowrap flex-shrink-0 ${
+        activeTab === tab
+          ? "bg-gradient-to-r from-primary to-accent text-white glow-purple"
+          : "bg-card text-muted-foreground hover:text-foreground border border-border/40"
+      }`}
+    >
+      {tab}
+    </button>
+  ))}
+</div>
 
           {/* TradingView Market Overview Widget */}
           <Card className="glass-dark overflow-hidden">
