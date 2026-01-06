@@ -17,7 +17,7 @@ export function EducationCenter() {
             <iframe
               width="100%"
               height="100%"
-              src="https://www.youtube.com/embed/JCM9CvjIGg8?start=180"
+src="https://www.youtube.com/embed/ogHmX5ybfyQ"
               title="Crypto Trading Education"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

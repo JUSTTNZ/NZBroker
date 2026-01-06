@@ -3,11 +3,12 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X } from "lucide-react"
+import { Menu, X, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false)
+  const [showAssetsMobile, setShowAssetsMobile] = useState(false)
   const router = useRouter()
 
   return (
@@ -21,7 +22,7 @@ export function Header() {
           AstralisX
         </Link>
 
-        {/* Desktop Navigation */}
+        {/* Desktop Navigation - Remains the same */}
         <div className="hidden md:flex items-center gap-8">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors relative group">
             Home
@@ -117,74 +118,108 @@ export function Header() {
         <div className="md:hidden border-t border-border/40 bg-card/50 backdrop-blur-sm p-4 space-y-4 max-h-96 overflow-y-auto">
           <Link
             href="/"
-            className="block text-foreground hover:text-primary transition-colors"
+            className="block py-2 px-3 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors"
             onClick={() => setIsOpen(false)}
           >
             Home
           </Link>
           <Link
             href="/trading"
-            className="block text-foreground hover:text-primary transition-colors"
+            className="block py-2 px-3 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors"
             onClick={() => setIsOpen(false)}
           >
             Trading
           </Link>
           <Link
             href="/markets"
-            className="block text-foreground hover:text-primary transition-colors"
+            className="block py-2 px-3 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors"
             onClick={() => setIsOpen(false)}
           >
             Markets
           </Link>
-          <Link
-            href="/cryptocurrencies"
-            className="block text-foreground hover:text-primary transition-colors pl-4"
-            onClick={() => setIsOpen(false)}
-          >
-            Cryptocurrencies
-          </Link>
-          <Link
-            href="/forex"
-            className="block text-foreground hover:text-primary transition-colors pl-4"
-            onClick={() => setIsOpen(false)}
-          >
-            Forex
-          </Link>
-          <Link
-            href="/indices"
-            className="block text-foreground hover:text-primary transition-colors pl-4"
-            onClick={() => setIsOpen(false)}
-          >
-            Indices
-          </Link>
-          <Link
-            href="/shares"
-            className="block text-foreground hover:text-primary transition-colors pl-4"
-            onClick={() => setIsOpen(false)}
-          >
-            Shares
-          </Link>
+
+          {/* Assets Dropdown for Mobile */}
+          <div className="border border-border/40 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowAssetsMobile(!showAssetsMobile)}
+              className="w-full flex items-center justify-between py-3 px-4 text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <span>Assets</span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${showAssetsMobile ? "rotate-180" : ""}`}
+              />
+            </button>
+            
+            {/* Assets Dropdown Content */}
+            {showAssetsMobile && (
+              <div className="border-t border-border/40 bg-background/50">
+                <Link
+                  href="/cryptocurrencies"
+                  className="block py-3 px-6 text-foreground hover:text-primary hover:bg-muted/30 transition-colors"
+                  onClick={() => {
+                    setIsOpen(false)
+                    setShowAssetsMobile(false)
+                  }}
+                >
+                  Cryptocurrencies
+                </Link>
+                <Link
+                  href="/forex"
+                  className="block py-3 px-6 text-foreground hover:text-primary hover:bg-muted/30 transition-colors"
+                  onClick={() => {
+                    setIsOpen(false)
+                    setShowAssetsMobile(false)
+                  }}
+                >
+                  Forex
+                </Link>
+                <Link
+                  href="/indices"
+                  className="block py-3 px-6 text-foreground hover:text-primary hover:bg-muted/30 transition-colors"
+                  onClick={() => {
+                    setIsOpen(false)
+                    setShowAssetsMobile(false)
+                  }}
+                >
+                  Indices
+                </Link>
+                <Link
+                  href="/shares"
+                  className="block py-3 px-6 text-foreground hover:text-primary hover:bg-muted/30 transition-colors"
+                  onClick={() => {
+                    setIsOpen(false)
+                    setShowAssetsMobile(false)
+                  }}
+                >
+                  Shares
+                </Link>
+              </div>
+            )}
+          </div>
+
           <Link
             href="/education"
-            className="block text-foreground hover:text-primary transition-colors"
+            className="block py-2 px-3 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors"
             onClick={() => setIsOpen(false)}
           >
             Education
           </Link>
           <Link
             href="/about"
-            className="block text-foreground hover:text-primary transition-colors"
+            className="block py-2 px-3 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors"
             onClick={() => setIsOpen(false)}
           >
             About
           </Link>
           <Link
             href="/contact"
-            className="block text-foreground hover:text-primary transition-colors"
+            className="block py-2 px-3 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors"
             onClick={() => setIsOpen(false)}
           >
             Contact
           </Link>
+
+          {/* Mobile CTA Buttons */}
           <div className="pt-4 border-t border-border/40 space-y-3">
             <Button
               variant="ghost"

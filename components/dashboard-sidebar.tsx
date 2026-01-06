@@ -132,7 +132,8 @@ export function DashboardSidebar() {
       {/* Sidebar - Optimized */}
       <aside
         className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-[90] ${
-          isExpanded ? "w-64" : "w-20"
+          // Always expanded width on mobile when open
+          isMobileOpen || isExpanded ? "w-64" : "w-20"
         } ${
           isMobileOpen 
             ? "translate-x-0 shadow-2xl" 
@@ -141,23 +142,36 @@ export function DashboardSidebar() {
       >
         {/* Header with collapse toggle */}
         <div className="p-4 border-b border-sidebar-border flex items-center justify-between h-16">
-          {isExpanded && (
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold text-sidebar-primary truncate">AstralisX</h2>
-              <p className="text-xs text-sidebar-foreground/60 truncate">Vault</p>
-            </div>
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-sidebar-primary truncate">AstralisX</h2>
+            <p className="text-xs text-sidebar-foreground/60 truncate">Vault</p>
+          </div>
+          
+          {/* Only show collapse button on desktop when sidebar is expanded */}
+          {!isMobileOpen && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 rounded-lg hover:bg-sidebar-accent transition-all duration-200 flex-shrink-0 active:scale-90"
+              aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              <IconComponents.ChevronLeft
+                className={`w-5 h-5 text-sidebar-foreground transition-transform duration-300 ${
+                  !isExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </button>
           )}
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 rounded-lg hover:bg-sidebar-accent transition-all duration-200 flex-shrink-0 active:scale-90"
-            aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            <IconComponents.ChevronLeft
-              className={`w-5 h-5 text-sidebar-foreground transition-transform duration-300 ${
-                !isExpanded ? "rotate-180" : ""
-              }`}
-            />
-          </button>
+          
+          {/* Show close button on mobile when sidebar is open */}
+          {isMobileOpen && (
+            <button
+              onClick={() => setIsMobileOpen(false)}
+              className="p-2 rounded-lg hover:bg-sidebar-accent transition-all duration-200 flex-shrink-0 active:scale-90"
+              aria-label="Close sidebar"
+            >
+              <IconComponents.X className="w-5 h-5 text-sidebar-foreground" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Links - Optimized */}
@@ -175,23 +189,18 @@ export function DashboardSidebar() {
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  } ${isExpanded ? "justify-start" : "justify-center"}`}
+                  } justify-start`} // Always justify-start when sidebar is open on mobile
+                  onClick={() => setIsMobileOpen(false)} // Close mobile sidebar on link click
                 >
                   {IconComponent ? (
                     <IconComponent className="w-5 h-5 flex-shrink-0" />
                   ) : (
                     <IconFallback />
                   )}
-                  {isExpanded && (
-                    <span className="text-sm font-medium truncate">
-                      {link.label}
-                    </span>
-                  )}
-                  {!isExpanded && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-sidebar border border-sidebar-border rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[100]">
-                      {link.label}
-                    </div>
-                  )}
+                  {/* Always show labels when sidebar is open (mobile or expanded) */}
+                  <span className="text-sm font-medium truncate">
+                    {link.label}
+                  </span>
                 </Link>
               )
             })}
@@ -205,17 +214,10 @@ export function DashboardSidebar() {
               localStorage.removeItem("authToken")
               window.location.href = "/"
             }}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors ${
-              isExpanded ? "justify-start" : "justify-center"
-            }`}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors justify-start"
           >
             <IconComponents.LogOut className="w-5 h-5 flex-shrink-0" />
-            {isExpanded && <span className="text-sm font-medium">Sign Out</span>}
-            {!isExpanded && (
-              <div className="absolute left-full ml-2 px-2 py-1 bg-sidebar border border-sidebar-border rounded text-xs font-medium opacity-0 hover:opacity-100 transition-opacity whitespace-nowrap z-[100]">
-                Sign Out
-              </div>
-            )}
+            <span className="text-sm font-medium">Sign Out</span>
           </button>
         </div>
       </aside>

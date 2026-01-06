@@ -28,9 +28,43 @@ export function CryptoTradingSection() {
 
           {/* Mini Charts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <MiniChart symbol="BTCUSD" />
+            {/* <MiniChart symbol="BTCUSD" />
             <MiniChart symbol="ETHUSD" />
-            <MiniChart symbol="LTCUSD" />
+            <MiniChart symbol="LTCUSD" /> */}
+                        <div className="min-h-[300px] w-full"> 
+      <Card className="glass-dark overflow-hidden h-full w-full">
+        <iframe
+       
+          // Use the formatted symbol in the URL
+    src="https://s.tradingview.com/embed-widget/advanced-chart/?symbol=BTCUSD&interval=D&timezone=Etc/UTC&theme=dark&style=3&locale=en&copyrightYear=2026"
+          className="w-full h-full border-0"
+          allowFullScreen
+        />
+      </Card>
+    </div>
+
+                <div className="min-h-[300px] w-full"> 
+      <Card className="glass-dark overflow-hidden h-full w-full">
+        <iframe
+       
+          // Use the formatted symbol in the URL
+    src="https://s.tradingview.com/embed-widget/advanced-chart/?symbol=ETHUSD&interval=D&timezone=Etc/UTC&theme=dark&style=3&locale=en&copyrightYear=2026"
+          className="w-full h-full border-0"
+          allowFullScreen
+        />
+      </Card>
+    </div>
+                <div className="min-h-[300px] w-full"> 
+      <Card className="glass-dark overflow-hidden h-full w-full">
+        <iframe
+       
+          // Use the formatted symbol in the URL
+    src="https://s.tradingview.com/embed-widget/advanced-chart/?symbol=LTCUSD&interval=D&timezone=Etc/UTC&theme=dark&style=3&locale=en&copyrightYear=2026"
+          className="w-full h-full border-0"
+          allowFullScreen
+        />
+      </Card>
+    </div>
           </div>
         </div>
       </div>
