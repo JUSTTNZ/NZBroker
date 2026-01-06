@@ -19,12 +19,12 @@ import {
 import { Button } from "@/components/ui/button"
 
 const adminLinks = [
-  { href: "/dashboard/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/admin/users", label: "User Management", icon: Users },
-  { href: "/dashboard/admin/withdrawals", label: "Withdrawals", icon: CreditCard },
-  { href: "/dashboard/admin/support", label: "Customer Support", icon: MessageSquare },
-  { href: "/dashboard/admin/transactions", label: "Transactions", icon: DollarSign },
-  { href: "/dashboard/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/users", label: "User Management", icon: Users },
+  { href: "/admin/withdrawals", label: "Withdrawals", icon: CreditCard },
+  { href: "/admin/support", label: "Customer Support", icon: MessageSquare },
+  { href: "/admin/transactions", label: "Transactions", icon: DollarSign },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
 export default function AdminLayout({
