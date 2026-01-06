@@ -8,7 +8,7 @@ import QRCode from "react-qr-code"
 
 export default function DepositPage() {
   const [amount, setAmount] = useState("")
-  const [selectedMethod, setSelectedMethod] = useState("card")
+  const [selectedMethod, setSelectedMethod] = useState("crypto")
   const [selectedCrypto, setSelectedCrypto] = useState<string | null>(null)
   const [walletCopied, setWalletCopied] = useState(false)
   const [file, setFile] = useState<File | null>(null)
