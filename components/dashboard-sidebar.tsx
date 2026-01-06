@@ -1,48 +1,99 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  ChevronLeft,
-  Menu,
-  X,
-  LayoutDashboard,
-  Copy,
-  TrendingUp,
-  Star,
-  User,
-  DollarSign,
-  PiggyBank,
-  Bot,
-  Share2,
-  CheckCircle,
-  Settings,
-  HelpCircle,
-  LogOut,
-  Bell,
-} from "lucide-react"
+import dynamic from "next/dynamic"
+
+// Dynamically import icons to reduce initial bundle size
+const IconComponents = {
+  LayoutDashboard: dynamic(() => import("lucide-react").then(mod => mod.LayoutDashboard), { ssr: false }),
+  Copy: dynamic(() => import("lucide-react").then(mod => mod.Copy), { ssr: false }),
+  TrendingUp: dynamic(() => import("lucide-react").then(mod => mod.TrendingUp), { ssr: false }),
+  Star: dynamic(() => import("lucide-react").then(mod => mod.Star), { ssr: false }),
+  User: dynamic(() => import("lucide-react").then(mod => mod.User), { ssr: false }),
+  DollarSign: dynamic(() => import("lucide-react").then(mod => mod.DollarSign), { ssr: false }),
+  PiggyBank: dynamic(() => import("lucide-react").then(mod => mod.PiggyBank), { ssr: false }),
+  Bot: dynamic(() => import("lucide-react").then(mod => mod.Bot), { ssr: false }),
+  Share2: dynamic(() => import("lucide-react").then(mod => mod.Share2), { ssr: false }),
+  CheckCircle: dynamic(() => import("lucide-react").then(mod => mod.CheckCircle), { ssr: false }),
+  Settings: dynamic(() => import("lucide-react").then(mod => mod.Settings), { ssr: false }),
+  HelpCircle: dynamic(() => import("lucide-react").then(mod => mod.HelpCircle), { ssr: false }),
+  Bell: dynamic(() => import("lucide-react").then(mod => mod.Bell), { ssr: false }),
+  ChevronLeft: dynamic(() => import("lucide-react").then(mod => mod.ChevronLeft), { ssr: false }),
+  Menu: dynamic(() => import("lucide-react").then(mod => mod.Menu), { ssr: false }),
+  X: dynamic(() => import("lucide-react").then(mod => mod.X), { ssr: false }),
+  LogOut: dynamic(() => import("lucide-react").then(mod => mod.LogOut), { ssr: false }),
+}
 
 const sidebarLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/copy-trading", label: "Copy Trading", icon: Copy },
-  { href: "/dashboard/stock-trade", label: "Stock Trade", icon: TrendingUp },
-  { href: "/dashboard/upgrade-plan", label: "Upgrade Plan", icon: Star },
-  { href: "/dashboard/account", label: "Account", icon: User },
-  { href: "/dashboard/deposit", label: "Deposit", icon: DollarSign },
-  { href: "/dashboard/withdraw", label: "Withdraw", icon: PiggyBank },
-  { href: "/dashboard/analysis-bot", label: "Analysis Bot", icon: Bot },
-  { href: "/dashboard/referral-program", label: "Referral Program", icon: Share2 },
-  { href: "/dashboard/kyc", label: "KYC", icon: CheckCircle },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-  { href: "/dashboard/support", label: "Support", icon: HelpCircle },
-  { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+  { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
+  { href: "/dashboard/copy-trading", label: "Copy Trading", icon: "Copy" },
+  { href: "/dashboard/stock-trade", label: "Stock Trade", icon: "TrendingUp" },
+  { href: "/dashboard/upgrade-plan", label: "Upgrade Plan", icon: "Star" },
+  { href: "/dashboard/account", label: "Account", icon: "User" },
+  { href: "/dashboard/deposit", label: "Deposit", icon: "DollarSign" },
+  { href: "/dashboard/withdraw", label: "Withdraw", icon: "PiggyBank" },
+  { href: "/dashboard/analysis-bot", label: "Analysis Bot", icon: "Bot" },
+  { href: "/dashboard/referral-program", label: "Referral Program", icon: "Share2" },
+  { href: "/dashboard/kyc", label: "KYC", icon: "CheckCircle" },
+  { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
+  { href: "/dashboard/support", label: "Support", icon: "HelpCircle" },
+  { href: "/dashboard/notifications", label: "Notifications", icon: "Bell" },
 ]
+
+// Simple loading fallback for icons
+const IconFallback = () => (
+  <div className="w-5 h-5 bg-muted rounded animate-pulse"></div>
+)
 
 export function DashboardSidebar() {
   const [isExpanded, setIsExpanded] = useState(true)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const pathname = usePathname()
+
+  // Set mounted state
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Handle responsive behavior - memoized
+  const handleResize = useCallback(() => {
+    if (window.innerWidth >= 1024) {
+      setIsMobileOpen(false)
+      setIsExpanded(true)
+    } else {
+      setIsExpanded(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [handleResize])
+
+  // Close mobile sidebar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const isSidebar = target.closest('aside')
+      const isToggleButton = target.closest('button[aria-label*="menu"]')
+      
+      if (isMobileOpen && !isSidebar && !isToggleButton) {
+        setIsMobileOpen(false)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [isMobileOpen])
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setIsMobileOpen(false)
+  }, [pathname])
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {
@@ -51,36 +102,57 @@ export function DashboardSidebar() {
     return pathname.startsWith(href)
   }
 
+  // Don't render until mounted to avoid hydration mismatch
+  if (!isMounted) {
+    return (
+      <>
+        <div className="lg:hidden fixed top-4 left-4 z-[100] p-2 rounded-lg bg-muted animate-pulse">
+          <div className="w-5 h-5"></div>
+        </div>
+        <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border animate-pulse"></aside>
+      </>
+    )
+  }
+
   return (
     <>
-      {/* Mobile toggle button - Always visible */}
+      {/* Mobile toggle button - Minimal */}
       <button
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95"
+        aria-label="Toggle mobile menu"
+        className="lg:hidden fixed top-4 left-4 z-[100] p-2 rounded-lg bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-transform"
         onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
-        {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        {isMobileOpen ? (
+          <IconComponents.X className="w-5 h-5" />
+        ) : (
+          <IconComponents.Menu className="w-5 h-5" />
+        )}
       </button>
 
-      {/* Sidebar - Fixed positioning with smooth collapse animation */}
+      {/* Sidebar - Optimized */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40 lg:z-10 ${
+        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-[90] ${
           isExpanded ? "w-64" : "w-20"
-        } ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        } ${
+          isMobileOpen 
+            ? "translate-x-0 shadow-2xl" 
+            : "-translate-x-full lg:translate-x-0"
+        }`}
       >
         {/* Header with collapse toggle */}
-        <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
+        <div className="p-4 border-b border-sidebar-border flex items-center justify-between h-16">
           {isExpanded && (
-            <div className="animate-fade-in-up">
-              <h2 className="text-xl font-bold text-sidebar-primary">AstralisX</h2>
-              <p className="text-xs text-sidebar-foreground/60">Vault</p>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-sidebar-primary truncate">AstralisX</h2>
+              <p className="text-xs text-sidebar-foreground/60 truncate">Vault</p>
             </div>
           )}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-2 rounded-lg hover:bg-sidebar-accent transition-all duration-200 flex-shrink-0 active:scale-90"
-            aria-label="Toggle sidebar"
+            aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
           >
-            <ChevronLeft
+            <IconComponents.ChevronLeft
               className={`w-5 h-5 text-sidebar-foreground transition-transform duration-300 ${
                 !isExpanded ? "rotate-180" : ""
               }`}
@@ -88,53 +160,72 @@ export function DashboardSidebar() {
           </button>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="mt-6 space-y-2 px-3 pb-24 overflow-y-auto max-h-[calc(100vh-120px)]">
-          {sidebarLinks.map((link, index) => {
-            const IconComponent = link.icon
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all justify-center lg:justify-start group ${
-                  isActive(link.href)
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                }`}
-                style={{
-                  animation: isMobileOpen ? `fadeInUp 0.3s ease-out ${index * 0.05}s both` : "none",
-                }}
-                onClick={() => setIsMobileOpen(false)}
-              >
-                <IconComponent className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                {isExpanded && (
-                  <span className="text-sm font-medium truncate transition-opacity duration-300">{link.label}</span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* Navigation Links - Optimized */}
+        <div className="h-[calc(100vh-128px)] overflow-y-auto">
+          <nav className="space-y-1 px-3 py-4">
+            {sidebarLinks.map((link) => {
+              const IconComponent = IconComponents[link.icon as keyof typeof IconComponents]
+              const active = isActive(link.href)
+              
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors group ${
+                    active
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  } ${isExpanded ? "justify-start" : "justify-center"}`}
+                >
+                  {IconComponent ? (
+                    <IconComponent className="w-5 h-5 flex-shrink-0" />
+                  ) : (
+                    <IconFallback />
+                  )}
+                  {isExpanded && (
+                    <span className="text-sm font-medium truncate">
+                      {link.label}
+                    </span>
+                  )}
+                  {!isExpanded && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-sidebar border border-sidebar-border rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[100]">
+                      {link.label}
+                    </div>
+                  )}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
 
-        {/* Sign Out */}
-        <div className="absolute bottom-6 left-3 right-3">
+        {/* Sign Out - Fixed at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-sidebar-border bg-sidebar">
           <button
             onClick={() => {
               localStorage.removeItem("authToken")
               window.location.href = "/"
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-all justify-center lg:justify-start active:scale-95`}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors ${
+              isExpanded ? "justify-start" : "justify-center"
+            }`}
           >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <IconComponents.LogOut className="w-5 h-5 flex-shrink-0" />
             {isExpanded && <span className="text-sm font-medium">Sign Out</span>}
+            {!isExpanded && (
+              <div className="absolute left-full ml-2 px-2 py-1 bg-sidebar border border-sidebar-border rounded text-xs font-medium opacity-0 hover:opacity-100 transition-opacity whitespace-nowrap z-[100]">
+                Sign Out
+              </div>
+            )}
           </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay - Only show on mobile */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-black/50 lg:hidden z-[80]"
           onClick={() => setIsMobileOpen(false)}
+          aria-hidden="true"
         />
       )}
     </>
