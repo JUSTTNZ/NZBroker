@@ -8,6 +8,7 @@ import { DashboardNavbar } from "@/components/dashboard-navbar"
 import { MessageCircle, Send, X, Paperclip, Smile, User } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/auth-context"
 
 interface Message {
   id: number
@@ -25,7 +26,7 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([
@@ -38,18 +39,19 @@ export default function DashboardLayout({
   ])
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    // Check if user is authenticated
-    const authToken = localStorage.getItem("authToken")
-    if (!authToken) {
-      // Redirect to login with the current path as redirect URL
-      router.push(`/login?redirect=${pathname}`)
-    } else {
-      setIsAuthenticated(true)
-      setIsLoading(false)
-    }
-  }, [pathname, router])
+  const { user,  } = useAuth()
+  // useEffect(() => {
+  //   // Check if user is authenticated
+  //   const authToken = localStorage.getItem("authToken")
+  //   if (!authToken) {
+  //     // Redirect to login with the current path as redirect URL
+  //     // router.push(`/login?redirect=${pathname}`)
+  //     // router.push(`/dashboard`)
+  //   } else {
+  //     // setIsAuthenticated(true)
+  //     // setIsLoading(false)
+  //   }
+  // }, [pathname, router])
 
   useEffect(() => {
     // Auto-scroll to bottom when messages change
@@ -107,10 +109,10 @@ export default function DashboardLayout({
     )
   }
 
-  if (!isAuthenticated) {
-    return null
-  }
-
+  // if (!isAuthenticated) {
+  //   return null
+  // }
+console.log("DashboardLayout user:", user)
   return (
     <div className="bg-background text-foreground min-h-screen">
       {/* Customer Service Chat Icon - Fixed Position */}

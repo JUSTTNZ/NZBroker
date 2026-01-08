@@ -8,6 +8,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -18,33 +19,29 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/dashboard"
 
+  const { signIn } = useAuth()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      // Validate inputs
       if (!email || !password) {
         setError("Please enter both email and password")
         setIsLoading(false)
         return
       }
-
-      // Store auth token in localStorage (placeholder for real auth)
-      localStorage.setItem(
-        "authToken",
-        JSON.stringify({
-          email,
-          timestamp: Date.now(),
-          isAuthenticated: true,
-        }),
-      )
-
-      // Redirect to dashboard or intended page
+console.log(error)
+      await signIn(email, password)
       router.push(redirect)
+      console.log(email, password)
+      console.log("Login successful")
+      // router.push("/dashboard")
+
     } catch (err) {
-      setError("Login failed. Please try again.")
+      console.log("Login error:", err)
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.")
       setIsLoading(false)
     }
   }
