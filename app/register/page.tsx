@@ -1,13 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("")
@@ -18,14 +18,13 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-
+   const { signUp } = useAuth()
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      // Validation
       if (!fullName || !email || !password || !confirmPassword) {
         setError("Please fill in all fields")
         setIsLoading(false)
@@ -50,21 +49,11 @@ export default function RegisterPage() {
         return
       }
 
-      // Create account (placeholder for real auth)
-      localStorage.setItem(
-        "authToken",
-        JSON.stringify({
-          email,
-          fullName,
-          timestamp: Date.now(),
-          isAuthenticated: true,
-        }),
-      )
-
-      // Redirect to dashboard
-      router.push("/dashboard")
+      await signUp(email, password, fullName)
+      router.push("/login")
     } catch (err) {
-      setError("Registration failed. Please try again.")
+      setError(err instanceof Error ? err.message : "Registration failed. Please try again.")
+      console.log("Registration error:", err)
       setIsLoading(false)
     }
   }

@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/lib/theme-provider"
+import { AuthProvider } from "@/lib/auth-context"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -12,12 +13,12 @@ export const metadata: Metadata = {
   title: "AstralisX Vault - Global Trading Platform",
   description: "Trade global markets with confidence. Forex, Crypto, Indices, Commodities, and Stocks",
   generator: "v0.app",
+  themeColor: "#0B0B12",
   viewport: {
     width: "device-width",
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
-    themeColor: "#0B0B12",
   },
   icons: {
     icon: [
@@ -46,7 +47,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`font-sans antialiased bg-background text-foreground`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

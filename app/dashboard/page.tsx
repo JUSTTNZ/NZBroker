@@ -6,31 +6,34 @@ import { Button } from "@/components/ui/button"
 import { TrendingUp, Eye } from "lucide-react"
 import { ScrollingTicker } from "@/components/scrolling-ticker"
 import { AdvancedChartWidget, MiniSymbolChart, MarketOverviewWidget } from "@/components/tradingview-widgets"
+import { useAuth } from "@/lib/auth-context"
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState("Nz")
   const [accountType, setAccountType] = useState("demo")
 
-  useEffect(() => {
-    const authToken = localStorage.getItem("authToken")
-    if (authToken) {
-      try {
-        const token = JSON.parse(authToken)
-        setUserName(token.fullName || "NZ")
-      } catch (e) {
-        console.log("[v0] Failed to parse auth token")
-      }
-    }
-  }, [])
+  // useEffect(() => {
+  //   const authToken = localStorage.getItem("authToken")
+  //   if (authToken) {
+  //     try {
+  //       const token = JSON.parse(authToken)
+  //       setUserName(token.fullName || "NZ")
+  //     } catch (e) {
+  //       console.log("[v0] Failed to parse auth token")
+  //     }
+  //   }
+  // }, [])
 
   const accountBalance = accountType === "demo" ? "$10,000.00" : "$0.00"
-
+const { user, userProfile } = useAuth()
+console.log("DashboardPage user:", user)
+console.log("DashboardPage userProfile:", userProfile)
   return (
     <div className="space-y-6">
       {/* Welcome Section - Added fade-in animation */}
       <div className="animate-fade-in-up">
         <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-          Welcome back, {userName}
+          Welcome back, {userProfile?.full_name || user?.email}
         </h1>
         <p className="text-muted-foreground text-sm md:text-base">
           Track your investments and trading performance in real-time
