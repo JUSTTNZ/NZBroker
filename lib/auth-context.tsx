@@ -351,12 +351,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user)
 
     if (data.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user.id)
-        .single()
-      setUserProfile(profile as UserProfile)
+      await fetchAllUserData(data.user.id)
+      console.log("✅ [AuthContext] All user data fetched")
     }
   }
 
