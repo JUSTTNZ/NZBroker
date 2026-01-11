@@ -39,7 +39,7 @@ interface UserPlan {
   plan: "basic" | "pro" | "elite"
   amount_paid: number
   payment_method: string | null
-  status: "active" | "cancelled" | "expired"
+  status: "active" | "cancelled" | "expired" |"pending"
   starts_at: string
   ends_at: string | null
   created_at: string
