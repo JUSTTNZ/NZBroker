@@ -36,7 +36,7 @@ export default function LoginPage() {
       await signIn(email, password)
       // router.push(redirect)
       console.log("Login successful")
-      router.push("/dashboard")
+      // router.push("/dashboard")
       
     } catch (err) {
       console.log("Login error:", err)
