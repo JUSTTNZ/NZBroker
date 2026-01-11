@@ -1,40 +1,215 @@
+// app/dashboard/account/page.tsx - UPDATED VERSION
 "use client"
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Camera, Eye, EyeOff, Upload } from "lucide-react"
+import { Camera, Eye, EyeOff, Upload, Loader2 } from "lucide-react"
 import { useState, useRef } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 export default function AccountPage() {
+  const { user, userProfile, refreshAllData } = useAuth()
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+  // Form state for profile
+  const [formData, setFormData] = useState({
+    fullName: userProfile?.full_name || "",
+    email: userProfile?.email || "",
+    phoneNumber: "", // You might want to add this to your profile schema
+    country: "United States" // Default
+  })
+
+  // Password state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  })
+
+  // Update form data when userProfile changes
+  useState(() => {
+    if (userProfile) {
+      setFormData({
+        fullName: userProfile.full_name || "",
+        email: userProfile.email || "",
+        phoneNumber: "", // Add if you have phone in profile
+        country: "United States" // Add if you have country in profile
+      })
+    }
+  })
+
+  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB')
+      return
+    }
+
+    try {
+      // Create a preview URL
+      const previewUrl = URL.createObjectURL(file)
+      setProfileImage(previewUrl)
+
+      // If you want to upload to Supabase Storage:
+      // const supabase = createClient()
+      // const fileExt = file.name.split('.').pop()
+      // const fileName = `${user?.id}-${Date.now()}.${fileExt}`
+      
+      // const { error } = await supabase.storage
+      //   .from('avatars')
+      //   .upload(fileName, file)
+
+      // if (error) throw error
+
+      // const { data } = supabase.storage
+      //   .from('avatars')
+      //   .getPublicUrl(fileName)
+
+      // setProfileImage(data.publicUrl)
+
+      toast.success('Profile image updated successfully')
+    } catch (error) {
+      console.error('Image upload error:', error)
+      toast.error('Failed to upload image')
     }
   }
 
-  const handleImageClick = () => {
-    fileInputRef.current?.click()
+  const handleSaveProfile = async () => {
+    if (!user) {
+      toast.error("Please login to update profile")
+      return
+    }
+
+    setIsSavingProfile(true)
+    
+    try {
+      const supabase = createClient()
+      
+      // Update profile in database
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: formData.fullName,
+          // Add phone and country if you have them in your schema
+          // phone: formData.phoneNumber,
+          // country: formData.country,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id)
+
+      if (error) {
+        console.error("Profile update error:", error)
+        throw new Error(error.message || "Failed to update profile")
+      }
+
+      // Update email in auth (requires reauthentication)
+      if (formData.email !== user.email) {
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: formData.email
+        })
+
+        if (emailError) {
+          console.error("Email update error:", emailError)
+          // Don't throw - just show warning
+          toast.warning("Profile updated but email change requires confirmation. Check your new email inbox.")
+        } else {
+          toast.warning("Check your new email inbox to confirm the email change")
+        }
+      }
+
+      // Refresh user data
+      await refreshAllData()
+      
+      toast.success("Profile updated successfully!")
+      
+    } catch (error: any) {
+      console.error('Profile update error:', error)
+      toast.error(error.message || 'Failed to update profile')
+    } finally {
+      setIsSavingProfile(false)
+    }
   }
 
-  const handleSaveChanges = () => {
-    // Add your save logic here
-    alert("Changes saved successfully!")
+  const handleChangePassword = async () => {
+    if (!user) {
+      toast.error("Please login to change password")
+      return
+    }
+
+    // Validate passwords
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords don't match")
+      return
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters")
+      return
+    }
+
+    setIsChangingPassword(true)
+    
+    try {
+      const supabase = createClient()
+      
+      // Update password using Supabase Auth
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      })
+
+      if (error) {
+        console.error("Password update error:", error)
+        throw new Error(error.message || "Failed to update password")
+      }
+
+      // Clear password fields
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      })
+
+      toast.success("Password updated successfully!")
+      
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      toast.error(error.message || 'Failed to change password')
+    } finally {
+      setIsChangingPassword(false)
+    }
   }
 
-  const handlePasswordChange = () => {
-    // Add your password change logic here
-    alert("Password changed successfully!")
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setPasswordData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
   return (
@@ -44,12 +219,34 @@ export default function AccountPage() {
         <p className="text-muted-foreground">Manage your trading account details</p>
       </div>
 
+      {/* Current Plan Info */}
+      {userProfile && (
+        <Card className="p-4 bg-card/50 border-border/40">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">Current Plan</h3>
+              <p className="text-sm text-muted-foreground capitalize">
+                {userProfile.current_plan} Plan • {userProfile.account_type === "demo" ? "Demo Account" : "Live Account"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Demo Balance: <span className="font-semibold text-green-500">${userProfile.demo_balance.toFixed(2)}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Live Balance: <span className="font-semibold text-blue-500">${userProfile.live_balance.toFixed(2)}</span>
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-8 bg-card/50 border-border/40">
         {/* Profile Image Section */}
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-8">
           <div className="relative">
             <div 
-              onClick={handleImageClick}
+              onClick={() => fileInputRef.current?.click()}
               className="w-32 h-32 rounded-full overflow-hidden bg-muted/30 border-2 border-border/40 cursor-pointer group relative"
             >
               {profileImage ? (
@@ -70,14 +267,10 @@ export default function AccountPage() {
             <input
               type="file"
               ref={fileInputRef}
-              onChange={handleImageUpload}
+              onChange={handleProfileImageUpload}
               accept="image/*"
               className="hidden"
             />
-            <div className="text-center mt-3">
-              <p className="text-sm text-muted-foreground">Click to upload photo</p>
-              <p className="text-xs text-muted-foreground">Max size: 5MB</p>
-            </div>
           </div>
 
           <div className="flex-1">
@@ -88,7 +281,9 @@ export default function AccountPage() {
                 <label className="block text-sm font-medium mb-2">Full Name</label>
                 <input
                   type="text"
-                  defaultValue="John Trader"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleInputChange}
                   className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none"
                 />
               </div>
@@ -96,7 +291,9 @@ export default function AccountPage() {
                 <label className="block text-sm font-medium mb-2">Email Address</label>
                 <input
                   type="email"
-                  defaultValue="john@example.com"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
                   className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none"
                 />
               </div>
@@ -104,16 +301,27 @@ export default function AccountPage() {
                 <label className="block text-sm font-medium mb-2">Phone Number</label>
                 <input
                   type="tel"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
                   placeholder="+1 (555) 000-0000"
                   className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Country</label>
-                <select className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none">
-                  <option>United States</option>
-                  <option>United Kingdom</option>
-                  <option>Canada</option>
+                <select 
+                  name="country"
+                  value={formData.country}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none"
+                >
+                  <option value="United States">United States</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="Canada">Canada</option>
+                  <option value="Australia">Australia</option>
+                  <option value="Germany">Germany</option>
+                  <option value="France">France</option>
                 </select>
               </div>
             </div>
@@ -121,10 +329,18 @@ export default function AccountPage() {
         </div>
 
         <Button 
-          onClick={handleSaveChanges}
-          className="bg-primary hover:bg-primary/90 w-full md:w-auto"
+          onClick={handleSaveProfile}
+          disabled={isSavingProfile}
+          className="bg-primary hover:bg-primary/90 w-full md:w-auto gap-2"
         >
-          Save Profile Changes
+          {isSavingProfile ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Profile Changes"
+          )}
         </Button>
       </Card>
 
@@ -138,6 +354,9 @@ export default function AccountPage() {
             <div className="relative">
               <input
                 type={showCurrentPassword ? "text" : "password"}
+                name="currentPassword"
+                value={passwordData.currentPassword}
+                onChange={handlePasswordChange}
                 placeholder="Enter current password"
                 className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none pr-12"
               />
@@ -156,6 +375,9 @@ export default function AccountPage() {
             <div className="relative">
               <input
                 type={showNewPassword ? "text" : "password"}
+                name="newPassword"
+                value={passwordData.newPassword}
+                onChange={handlePasswordChange}
                 placeholder="Enter new password"
                 className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none pr-12"
               />
@@ -177,6 +399,9 @@ export default function AccountPage() {
             <div className="relative">
               <input
                 type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={passwordData.confirmPassword}
+                onChange={handlePasswordChange}
                 placeholder="Confirm new password"
                 className="w-full px-4 py-2 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none pr-12"
               />
@@ -191,39 +416,60 @@ export default function AccountPage() {
           </div>
 
           <Button 
-            onClick={handlePasswordChange}
-            className="bg-primary hover:bg-primary/90 w-full md:w-auto"
+            onClick={handleChangePassword}
+            disabled={isChangingPassword}
+            className="bg-primary hover:bg-primary/90 w-full md:w-auto gap-2"
           >
-            Update Password
+            {isChangingPassword ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              "Update Password"
+            )}
           </Button>
         </div>
       </Card>
 
-      {/* Additional Security Options */}
+      {/* Account Information */}
       <Card className="p-8 bg-card/50 border-border/40">
-        <h3 className="text-xl font-semibold mb-6">Security Settings</h3>
+        <h3 className="text-xl font-semibold mb-6">Account Information</h3>
         
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background/30">
-            <div>
-              <p className="font-medium">Two-Factor Authentication</p>
-              <p className="text-sm text-muted-foreground">Add an extra layer of security to your account</p>
-            </div>
-            <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10">
-              Enable
-            </Button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">User ID</h4>
+            <p className="font-mono text-sm bg-background/30 p-2 rounded border border-border/40 break-all">
+              {user?.email || "Not available"}
+            </p>
           </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background/30">
-            <div>
-              <p className="font-medium">Login Notifications</p>
-              <p className="text-sm text-muted-foreground">Get notified about new sign-ins</p>
+          
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Account Type</h4>
+            <div className="flex items-center gap-2">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${userProfile?.account_type === "demo" ? "bg-yellow-500/10 text-yellow-600" : "bg-green-500/10 text-green-600"}`}>
+                {userProfile?.account_type === "demo" ? "Demo Account" : "Live Account"}
+              </div>
             </div>
-            <div className="relative">
-              <input type="checkbox" id="notifications" className="sr-only" />
-              <label htmlFor="notifications" className="relative w-12 h-6 bg-muted rounded-full cursor-pointer">
-                <span className="absolute top-1 left-1 w-4 h-4 bg-background rounded-full transition-transform"></span>
-              </label>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Account Created</h4>
+            <p className="text-sm">
+              {userProfile?.created_at ? new Date(userProfile.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }) : "Not available"}
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Role</h4>
+            <div className="flex items-center gap-2">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${userProfile?.role === "admin" ? "bg-purple-500/10 text-purple-600" : "bg-blue-500/10 text-blue-600"}`}>
+                {userProfile?.role || "user"}
+              </div>
             </div>
           </div>
         </div>

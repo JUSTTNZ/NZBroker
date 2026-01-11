@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get("redirect") || "/dashboard"
+  // const redirect = searchParams.get("redirect") || "/dashboard"
 
   const { signIn } = useAuth()
 
@@ -32,13 +32,12 @@ export default function LoginPage() {
         setIsLoading(false)
         return
       }
-console.log(error)
+
       await signIn(email, password)
-      router.push(redirect)
-      console.log(email, password)
+      // router.push(redirect)
       console.log("Login successful")
       // router.push("/dashboard")
-
+      
     } catch (err) {
       console.log("Login error:", err)
       setError(err instanceof Error ? err.message : "Login failed. Please try again.")

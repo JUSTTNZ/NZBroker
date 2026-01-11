@@ -39,7 +39,7 @@ interface UserPlan {
   plan: "basic" | "pro" | "elite"
   amount_paid: number
   payment_method: string | null
-  status: "active" | "cancelled" | "expired"
+  status: "active" | "cancelled" | "expired" | "pending"
   starts_at: string
   ends_at: string | null
   created_at: string
@@ -340,31 +340,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   console.log("🎉 [AuthContext] Signup completed successfully")
 }
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+const signIn = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
-    if (error) throw error
+  if (error) throw error
 
-    setUser(data.user)
+  setUser(data.user)
 
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user.id)
-        .single()
-      setUserProfile(profile as UserProfile)
+  if (data.user) {
+    // FIRST: Directly fetch the profile to get role
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .single()
+
+    console.log("👤 User role:", profile?.role)
+    
+    // THEN: Redirect based on role
+    if (profile?.role === "admin") {
+      console.log("👑 Redirecting admin to /admin")
+      window.location.href = "/admin"
+    } else {
+      console.log("👤 Redirecting user to /dashboard")
+      window.location.href = "/dashboard"
     }
+    
+    // Optional: Fetch the rest of the data in background
+    fetchAllUserData(data.user.id).then(() => {
+      console.log("✅ Background data fetch complete")
+    })
   }
+}
 
-  const signOut = async () => {
-    console.log("🚪 [AuthContext] Signing out...")
-    await supabase.auth.signOut()
-    // State will be cleared by the onAuthStateChange listener
-  }
+const signOut = async () => {
+  console.log("🚪 [AuthContext] Signing out...")
+  
+  // Clear state FIRST
+  setUser(null)
+  setUserProfile(null)
+  setWallets(null)
+  setUserPlans(null)
+  setTransactions(null)
+  setCurrentWallet(null)
+  setActivePlan(null)
+  
+  // Then sign out from Supabase
+  await supabase.auth.signOut()
+  
+  console.log("✅ [AuthContext] Sign out complete")
+}
 
   const refreshUser = async () => {
     console.log("🔄 [AuthContext] Refreshing user...")

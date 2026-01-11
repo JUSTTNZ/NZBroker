@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,42 +15,37 @@ import {
   Mail,
   Calendar
 } from "lucide-react"
-
-const users = [
-  { id: 1, name: "John Doe", email: "john@example.com", balance: 12500, status: "active", kyc: "verified", joined: "2024-12-01" },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", balance: 8500, status: "active", kyc: "pending", joined: "2024-12-02" },
-  { id: 3, name: "Bob Johnson", email: "bob@example.com", balance: 3200, status: "inactive", kyc: "rejected", joined: "2024-12-03" },
-  { id: 4, name: "Alice Brown", email: "alice@example.com", balance: 15400, status: "active", kyc: "verified", joined: "2024-12-04" },
-  { id: 5, name: "Mike Wilson", email: "mike@example.com", balance: 0, status: "pending", kyc: "none", joined: "2024-12-05" },
-  { id: 6, name: "Sarah Davis", email: "sarah@example.com", balance: 500, status: "pending", kyc: "none", joined: "2024-12-06" },
-]
+import { fetchAllUsers, type AdminUser } from "@/lib/admin"
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedUser, setSelectedUser] = useState<number | null>(null)
-  const [balanceInput, setBalanceInput] = useState("")
+  const [loading, setLoading] = useState(true)
+
+  // Fetch users on mount
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  const loadUsers = async () => {
+    setLoading(true)
+    const fetchedUsers = await fetchAllUsers()
+    setUsers(fetchedUsers)
+    setLoading(false)
+  }
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) || 
-                         user.email.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = 
+      user.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+      user.email?.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === "all" || user.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const handleApproveUser = (userId: number) => {
-    alert(`User ${userId} approved`)
-  }
-
-  const handleRejectUser = (userId: number) => {
-    alert(`User ${userId} rejected`)
-  }
-
-  const handleSetBalance = (userId: number) => {
-    if (balanceInput && !isNaN(parseFloat(balanceInput))) {
-      alert(`Balance for user ${userId} set to $${parseFloat(balanceInput)}`)
-      setBalanceInput("")
-    }
+  const getWalletBalance = (user: AdminUser, accountType: 'demo' | 'live') => {
+    const wallet = user.wallets?.find(w => w.account_type === accountType)
+    return wallet?.total_balance || 0
   }
 
   const statusCounts = {
@@ -58,6 +53,35 @@ export default function UsersPage() {
     active: users.filter(u => u.status === "active").length,
     pending: users.filter(u => u.status === "pending").length,
     inactive: users.filter(u => u.status === "inactive").length,
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  // User management actions
+  const handleApproveUser = (user: AdminUser) => {
+    // TODO: Implement user approval
+    console.log("Approve user:", user.id)
+  }
+
+  const handleSuspendUser = (user: AdminUser) => {
+    // TODO: Implement user suspension
+    console.log("Suspend user:", user.id)
+  }
+
+  const handleActivateUser = (user: AdminUser) => {
+    // TODO: Implement user activation
+    console.log("Activate user:", user.id)
+  }
+
+  const handleViewDetails = (user: AdminUser) => {
+    // TODO: Navigate to user details page
+    console.log("View details for user:", user.id)
   }
 
   return (
@@ -82,9 +106,9 @@ export default function UsersPage() {
           <p className="text-2xl font-bold text-yellow-500">{statusCounts.pending}</p>
         </Card>
         <Card className="p-4 bg-card/50 border-border/40">
-          <p className="text-sm text-muted-foreground mb-2">KYC Verified</p>
+          <p className="text-sm text-muted-foreground mb-2">Total Live Balance</p>
           <p className="text-2xl font-bold text-blue-500">
-            {users.filter(u => u.kyc === "verified").length}
+            ${users.reduce((sum, user) => sum + getWalletBalance(user, 'live'), 0).toLocaleString()}
           </p>
         </Card>
       </div>
@@ -116,102 +140,134 @@ export default function UsersPage() {
               </Button>
             ))}
           </div>
+          <Button onClick={loadUsers} variant="outline" size="sm">
+            Refresh
+          </Button>
         </div>
       </Card>
 
       {/* Users Table */}
       <Card className="p-6 bg-card/50 border-border/40">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border/40">
-                <th className="text-left py-3 px-4 font-medium">User</th>
-                <th className="text-left py-3 px-4 font-medium">Balance</th>
-                <th className="text-left py-3 px-4 font-medium">Status</th>
-                <th className="text-left py-3 px-4 font-medium">KYC</th>
-                <th className="text-left py-3 px-4 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-border/20 hover:bg-background/30">
-                  <td className="py-3 px-4">
-                    <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Mail className="w-3 h-3" />
-                        {user.email}
-                      </p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        Joined {user.joined}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold">${user.balance.toLocaleString()}</p>
-                      {user.status === "pending" && (
-                        <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            placeholder="Set balance"
-                            value={selectedUser === user.id ? balanceInput : ""}
-                            onChange={(e) => setBalanceInput(e.target.value)}
-                            className="w-32"
-                            onClick={() => setSelectedUser(user.id)}
-                          />
-                          <Button size="sm" onClick={() => handleSetBalance(user.id)}>
-                            Set
+        {loading ? (
+          <div className="text-center py-8">
+            <p>Loading users...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border/40">
+                  <th className="text-left py-3 px-4 font-medium">User</th>
+
+                  <th className="text-left py-3 px-4 font-medium">Plan</th>
+                  <th className="text-left py-3 px-4 font-medium">Status</th>
+                  <th className="text-left py-3 px-4 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="border-b border-border/20 hover:bg-background/30">
+                    <td className="py-3 px-4">
+                      <div>
+                        <p className="font-medium">{user.full_name || "No name"}</p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {user.email}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Joined {formatDate(user.created_at)}
+                        </p>
+                      
+                      </div>
+                    </td>
+                
+                    <td className="py-3 px-4">
+                      <Badge className={
+                        user.current_plan === 'elite' ? 'bg-purple-500/20 text-purple-500 border-purple-500/30' :
+                        user.current_plan === 'pro' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30' :
+                        'bg-gray-500/20 text-gray-500 border-gray-500/30'
+                      }>
+                        {user.current_plan}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="space-y-2">
+                        <Badge className={
+                          user.status === "active" ? "bg-green-500/20 text-green-500 border-green-500/30" :
+                          user.status === "pending" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" :
+                          "bg-gray-500/20 text-gray-500 border-gray-500/30"
+                        }>
+                          {user.status}
+                        </Badge>
+                        <div>
+                          <Badge className={
+                            user.kyc_status === "verified" ? "bg-green-500/20 text-green-500 border-green-500/30" :
+                            user.kyc_status === "pending" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" :
+                            user.kyc_status === "rejected" ? "bg-red-500/20 text-red-500 border-red-500/30" :
+                            "bg-gray-500/20 text-gray-500 border-gray-500/30"
+                          }>
+                            KYC: {user.kyc_status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => handleViewDetails(user)}
+                          >
+                            View Details
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            className="flex-1"
+                          >
+                            <MoreVertical className="w-4 h-4" />
                           </Button>
                         </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge className={
-                      user.status === "active" ? "bg-green-500/20 text-green-500 border-green-500/30" :
-                      user.status === "pending" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" :
-                      "bg-gray-500/20 text-gray-500 border-gray-500/30"
-                    }>
-                      {user.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge className={
-                      user.kyc === "verified" ? "bg-green-500/20 text-green-500 border-green-500/30" :
-                      user.kyc === "pending" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" :
-                      user.kyc === "rejected" ? "bg-red-500/20 text-red-500 border-red-500/30" :
-                      "bg-gray-500/20 text-gray-500 border-gray-500/30"
-                    }>
-                      {user.kyc}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex gap-2">
-                      {user.status === "pending" ? (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => handleRejectUser(user.id)}>
-                            <UserX className="w-4 h-4 mr-2" />
-                            Reject
-                          </Button>
-                          <Button size="sm" onClick={() => handleApproveUser(user.id)}>
-                            <UserCheck className="w-4 h-4 mr-2" />
-                            Approve
-                          </Button>
-                        </>
-                      ) : (
-                        <Button size="sm" variant="ghost">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        
+                        <div className="flex gap-2">
+                          {user.status === "active" ? (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1"
+                              onClick={() => handleSuspendUser(user)}
+                            >
+                              <UserX className="w-4 h-4 mr-2" />
+                              Suspend
+                            </Button>
+                          ) : (
+                            <Button 
+                              size="sm" 
+                              className="flex-1"
+                              onClick={() => handleActivateUser(user)}
+                            >
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Activate
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {filteredUsers.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No users found matching your criteria
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   )
