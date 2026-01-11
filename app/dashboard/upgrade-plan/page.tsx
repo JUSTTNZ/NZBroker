@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
-import { createClient } from "@/lib/supabase/client" // Import browser client
+import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { 
   Check, 
@@ -67,11 +67,11 @@ export default function UpgradePlanPage() {
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   
-  // Get user's current plan
+  // Get user's current plan from profile
   const currentPlan = userProfile?.current_plan || "basic"
   
-  // Find pending upgrade request
-  const pendingPlan = userPlans?.find(p => p.status === "pending")
+  // Find pending upgrade requests
+  const pendingRequests = userPlans?.filter(p => p.status === "pending") || []
   
   // Find active plan
   const activePlan = userPlans?.find(p => p.status === "active")
@@ -79,7 +79,12 @@ export default function UpgradePlanPage() {
   // Find the plan object for current plan
   const currentPlanData = availablePlans.find(p => p.plan_id === currentPlan)
 
-  // UPDATED: Handle upgrade request WITHOUT API
+  // Check if user has a pending request for a specific plan
+  const hasPendingRequestForPlan = (planId: string) => {
+    return pendingRequests.some(p => p.plan === planId)
+  }
+
+  // Handle upgrade request
   const handleUpgradeRequest = async (planId: string, planName: string, planPrice: string) => {
     if (!user) {
       toast.error("Please login to request plan upgrade")
@@ -91,8 +96,8 @@ export default function UpgradePlanPage() {
       return
     }
     
-    if (pendingPlan) {
-      toast.error("You already have a pending upgrade request")
+    if (hasPendingRequestForPlan(planId)) {
+      toast.error(`You already have a pending request for ${planName} plan`)
       return
     }
     
@@ -102,32 +107,31 @@ export default function UpgradePlanPage() {
     try {
       console.log(`📝 Requesting upgrade to ${planName} for user: ${user.id}`)
       
-      // 1. Create Supabase browser client
-      const supabase = createClient() // Browser client, same as in auth context
+      // Create Supabase browser client
+      const supabase = createClient()
       
-      // 2. Check if user already has a pending request (double-check)
-      const { data: existingRequests } = await supabase
-        .from("user_plans")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "pending")
-        .limit(1)
-
-      if (existingRequests && existingRequests.length > 0) {
-        throw new Error("You already have a pending upgrade request")
+      // Calculate plan expiration date (if needed, but won't be used until approved)
+      const calculateExpiryDate = () => {
+        const now = new Date()
+        if (planId === "pro") {
+          now.setDate(now.getDate() + 7) // 7 days for Pro
+        } else if (planId === "elite") {
+          now.setDate(now.getDate() + 30) // 30 days for Elite
+        }
+        return now.toISOString()
       }
 
-      // 3. Create upgrade request record
+      // Create upgrade request record with "pending" status
       const { error: insertError } = await supabase.from("user_plans").insert([
         {
           user_id: user.id,
           plan: planId,
           amount_paid: 0,
           payment_method: "upgrade_request",
-          status: "pending",
-          starts_at: null,
-          ends_at: null,
-  
+          status: "pending", // Important: Set as pending
+          starts_at: null, // Will be set when approved
+          ends_at: null, // Will be set when approved
+          created_at: new Date().toISOString()
         },
       ])
 
@@ -136,21 +140,11 @@ export default function UpgradePlanPage() {
         throw new Error(insertError.message || "Failed to create upgrade request")
       }
 
-      // 4. Update user's profile to show requested plan (temporarily)
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          current_plan: planId,
-          plan_expires_at: null,
-        })
-        .eq("id", user.id)
+      // IMPORTANT: DO NOT update the profile yet!
+      // The profile.current_plan should remain as the current active plan
+      // until admin approves the upgrade request
 
-      if (updateError) {
-        console.error("⚠️ Profile update error:", updateError)
-        // Continue anyway - the main request was created
-      }
-
-      // 5. Create notification for user
+      // Create notification for user
       const { error: notificationError } = await supabase
         .from("notifications")
         .insert({
@@ -167,14 +161,14 @@ export default function UpgradePlanPage() {
         // Continue anyway
       }
 
-      // 6. Refresh user data to show pending request
+      // Refresh user data to show pending request
       await refreshAllData()
       
       toast.success(`✅ Upgrade request for ${planName} plan submitted successfully!`)
       
       setMessage({ 
         type: 'success', 
-        text: `Your request for ${planName} plan has been submitted. Our admin team will review it and update your account shortly.` 
+        text: `Your request for ${planName} plan has been submitted. You'll remain on your current "${currentPlan}" plan until admin approves your request.` 
       })
       
     } catch (error: any) {
@@ -234,17 +228,26 @@ export default function UpgradePlanPage() {
                 </div>
               </div>
             </div>
+            <p className="text-sm text-muted-foreground mt-3">
+              You will remain on this plan until your upgrade request is approved by admin.
+            </p>
           </div>
           
-          {pendingPlan && (
+          {pendingRequests.length > 0 && (
             <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-yellow-700">Upgrade Request Pending</h4>
-                  <p className="text-sm text-yellow-600">
-                    Your request to upgrade to <span className="font-semibold capitalize">{pendingPlan.plan}</span> plan is under review.
-                  </p>
+                  <h4 className="font-semibold text-yellow-700">
+                    {pendingRequests.length} Pending Upgrade Request{pendingRequests.length > 1 ? 's' : ''}
+                  </h4>
+                  <div className="text-sm text-yellow-600 space-y-1">
+                    {pendingRequests.map((request, index) => (
+                      <p key={index}>
+                        • Request to upgrade to <span className="font-semibold capitalize">{request.plan}</span> plan
+                      </p>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -266,9 +269,9 @@ export default function UpgradePlanPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {availablePlans.map((plan) => {
           const isCurrentPlan = plan.plan_id === currentPlan
-          const isPendingPlan = pendingPlan?.plan === plan.plan_id
+          const hasPendingRequest = hasPendingRequestForPlan(plan.plan_id)
           const isLoading = loadingPlanId === plan.plan_id
-          const isUpgradeAvailable = !isCurrentPlan && !pendingPlan
+          const isUpgradeAvailable = !isCurrentPlan && !hasPendingRequest
           
           return (
             <Card
@@ -332,7 +335,7 @@ export default function UpgradePlanPage() {
                 className={`w-full py-3 font-semibold gap-2 ${
                   isCurrentPlan
                     ? "bg-muted text-muted-foreground cursor-not-allowed"
-                    : isPendingPlan
+                    : hasPendingRequest
                       ? "bg-yellow-500 hover:bg-yellow-600"
                       : plan.popular
                         ? "bg-primary hover:bg-primary/90"
@@ -345,7 +348,7 @@ export default function UpgradePlanPage() {
                 
                 {isCurrentPlan 
                   ? "Current Plan" 
-                  : isPendingPlan 
+                  : hasPendingRequest 
                     ? <><Clock className="w-4 h-4" /> Request Pending</>
                     : <><ArrowUpRight className="w-4 h-4" /> Request Upgrade</>}
               </Button>
@@ -357,14 +360,14 @@ export default function UpgradePlanPage() {
                     <Check className="w-3 h-3" /> You are on this plan
                   </div>
                 )}
-                {isPendingPlan && (
+                {hasPendingRequest && (
                   <div className="text-xs text-yellow-600 font-medium flex items-center justify-center gap-1">
-                    <Clock className="w-3 h-3" /> Upgrade request pending admin approval
+                    <Clock className="w-3 h-3" /> Request pending approval
                   </div>
                 )}
                 {isUpgradeAvailable && (
                   <div className="text-xs text-muted-foreground mt-2">
-                    Requires admin approval
+                    Admin approval required
                   </div>
                 )}
               </div>
@@ -379,16 +382,16 @@ export default function UpgradePlanPage() {
           <CreditCard className="w-5 h-5" />
           How Plan Upgrades Work
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="text-center p-4">
             <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
                 <span className="text-blue-600 font-bold text-xl">1</span>
               </div>
             </div>
-            <h4 className="font-semibold mb-2">Request Upgrade</h4>
+            <h4 className="font-semibold mb-2">Stay on Current Plan</h4>
             <p className="text-sm text-muted-foreground">
-              Submit a request for your desired plan. No payment required upfront.
+              You remain on your current plan until your request is approved
             </p>
           </div>
           
@@ -396,6 +399,18 @@ export default function UpgradePlanPage() {
             <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
                 <span className="text-blue-600 font-bold text-xl">2</span>
+              </div>
+            </div>
+            <h4 className="font-semibold mb-2">Request Upgrade</h4>
+            <p className="text-sm text-muted-foreground">
+              Submit a request for your desired plan. No immediate changes to your account.
+            </p>
+          </div>
+          
+          <div className="text-center p-4">
+            <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                <span className="text-blue-600 font-bold text-xl">3</span>
               </div>
             </div>
             <h4 className="font-semibold mb-2">Admin Review</h4>
@@ -407,12 +422,12 @@ export default function UpgradePlanPage() {
           <div className="text-center p-4">
             <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 font-bold text-xl">3</span>
+                <span className="text-blue-600 font-bold text-xl">4</span>
               </div>
             </div>
             <h4 className="font-semibold mb-2">Get Activated</h4>
             <p className="text-sm text-muted-foreground">
-              Once approved, your new plan features are activated immediately.
+              Only after approval, your new plan is activated immediately.
             </p>
           </div>
         </div>
@@ -422,6 +437,12 @@ export default function UpgradePlanPage() {
       <Card className="p-6 border-border/40">
         <h3 className="text-lg font-bold mb-4">Frequently Asked Questions</h3>
         <div className="space-y-4">
+          <div>
+            <h4 className="font-semibold mb-1">Do I get the new plan features immediately?</h4>
+            <p className="text-sm text-muted-foreground">
+              No. You will continue using your current plan features until the admin approves your upgrade request.
+            </p>
+          </div>
           <div>
             <h4 className="font-semibold mb-1">How long does approval take?</h4>
             <p className="text-sm text-muted-foreground">
@@ -435,9 +456,9 @@ export default function UpgradePlanPage() {
             </p>
           </div>
           <div>
-            <h4 className="font-semibold mb-1">What happens after my plan expires?</h4>
+            <h4 className="font-semibold mb-1">What happens if my current plan expires while waiting?</h4>
             <p className="text-sm text-muted-foreground">
-              You'll automatically revert to the Basic plan. You can request an upgrade again at any time.
+              Your account will revert to Basic plan features. If your upgrade is approved later, you'll get the new plan.
             </p>
           </div>
         </div>

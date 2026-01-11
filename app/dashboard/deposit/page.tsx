@@ -1,23 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CreditCard, Zap, DollarSign, Copy, Check, Upload } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import { 
+  CreditCard, 
+  Zap, 
+  DollarSign, 
+  Copy, 
+  Check, 
+  Upload,
+  ArrowRightLeft,
+  Wallet,
+  TrendingUp,
+  Bot,
+  RefreshCw,
+  AlertCircle
+} from "lucide-react"
 import QRCode from "react-qr-code"
 
 export default function DepositPage() {
+  const { user, currentWallet, userProfile, refreshAllData } = useAuth()
   const [amount, setAmount] = useState("")
-  const [selectedMethod, setSelectedMethod] = useState("crypto")
+  const [selectedMethod, setSelectedMethod] = useState("transfer")
   const [selectedCrypto, setSelectedCrypto] = useState<string | null>(null)
   const [walletCopied, setWalletCopied] = useState(false)
   const [file, setFile] = useState<File | null>(null)
+  const [transferFrom, setTransferFrom] = useState<string>("total")
+  const [transferTo, setTransferTo] = useState<string>("trading")
+  const [transferring, setTransferring] = useState(false)
+  
+  const supabase = createClient()
 
   const paymentMethods = [
-        { id: "crypto", name: "Cryptocurrency", icon: DollarSign, desc: "Instant deposit" },
-    { id: "card", name: "Credit Card", icon: CreditCard, desc: "Instant deposit" },
+    { id: "transfer", name: "Internal Transfer", icon: ArrowRightLeft, desc: "Move funds between wallets" },
+    { id: "crypto", name: "Cryptocurrency", icon: DollarSign, desc: "External deposit" },
+    { id: "card", name: "Credit Card", icon: CreditCard, desc: "External deposit" },
     { id: "bank", name: "Bank Transfer", icon: Zap, desc: "1-2 business days" },
-
   ]
 
   const cryptoCurrencies = [
@@ -32,6 +58,23 @@ export default function DepositPage() {
     btc: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
     usdt: "TKrjq7L8x2dY7vq1V2nTqP3k4M5n6B7v8C9d0E1f2G3",
     solana: "So1anaWaL1etAddR3ss1234567890ABCDEFGHIJKLM",
+  }
+
+  const transferOptions = [
+    { id: "total", name: "Total Balance", icon: Wallet, description: "Main wallet balance" },
+    { id: "trading", name: "Trading Balance", icon: TrendingUp, description: "For manual trading" },
+    { id: "bot", name: "Bot Trading Balance", icon: Bot, description: "For auto trading" },
+  ]
+
+  const getCurrentBalance = (walletType: string) => {
+    if (!currentWallet) return 0
+    
+    switch(walletType) {
+      case "total": return currentWallet.total_balance
+      case "trading": return currentWallet.trading_balance
+      case "bot": return currentWallet.bot_trading_balance
+      default: return 0
+    }
   }
 
   const handleCopyWallet = (wallet: string) => {
@@ -50,16 +93,158 @@ export default function DepositPage() {
     setSelectedCrypto(cryptoId)
   }
 
+  const handleTransfer = async () => {
+    if (!user || !currentWallet) {
+      toast.error("Please login to transfer funds")
+      return
+    }
+
+    const transferAmount = parseFloat(amount)
+    
+    if (!transferAmount || transferAmount <= 0) {
+      toast.error("Please enter a valid amount")
+      return
+    }
+
+    if (transferFrom === transferTo) {
+      toast.error("Cannot transfer to the same wallet")
+      return
+    }
+
+    const fromBalance = getCurrentBalance(transferFrom)
+    if (transferAmount > fromBalance) {
+      toast.error(`Insufficient balance in ${transferFrom} wallet`)
+      return
+    }
+
+    setTransferring(true)
+    
+    try {
+      console.log(`🔄 Transferring $${transferAmount} from ${transferFrom} to ${transferTo}`)
+
+      // Calculate new balances
+      const newFromBalance = fromBalance - transferAmount
+      const toBalance = getCurrentBalance(transferTo)
+      const newToBalance = toBalance + transferAmount
+
+      // Prepare update object
+      const updateData: any = { updated_at: new Date().toISOString() }
+      
+      // Set from balance
+      if (transferFrom === "total") updateData.total_balance = newFromBalance
+      else if (transferFrom === "trading") updateData.trading_balance = newFromBalance
+      else if (transferFrom === "bot") updateData.bot_trading_balance = newFromBalance
+      
+      // Set to balance
+      if (transferTo === "total") updateData.total_balance = newToBalance
+      else if (transferTo === "trading") updateData.trading_balance = newToBalance
+      else if (transferTo === "bot") updateData.bot_trading_balance = newToBalance
+
+      // Update wallet
+      const { error: updateError } = await supabase
+        .from("wallets")
+        .update(updateData)
+        .eq("id", currentWallet.id)
+
+      if (updateError) {
+        throw new Error(updateError.message)
+      }
+
+      // Create transaction record
+      const { error: transactionError } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: user.id,
+          account_type: currentWallet.account_type,
+          type: "transfer",
+          amount: transferAmount,
+          description: `Transfer from ${transferFrom} to ${transferTo} balance`,
+          status: "completed",
+          reference_id: `TRANSFER_${user.id}_${Date.now()}`,
+          created_at: new Date().toISOString()
+        })
+
+      if (transactionError) {
+        console.warn("Transaction log error:", transactionError)
+        // Continue anyway
+      }
+
+      // Create notification
+      const { error: notificationError } = await supabase.from("notifications").insert({
+        user_id: user.id,
+        title: "Funds Transferred",
+        message: `Successfully transferred $${transferAmount.toFixed(2)} from ${transferFrom} to ${transferTo}`,
+        type: "transfer",
+        read: false,
+        created_at: new Date().toISOString()
+      })
+ if(notificationError){
+  console.warn("Notification error:", notificationError)
+ }
+      // Refresh data
+      await refreshAllData()
+      
+      // Reset form
+      setAmount("")
+      
+      toast.success(`✅ Successfully transferred $${transferAmount.toFixed(2)}`)
+      
+    } catch (error: any) {
+      console.error("❌ Transfer error:", error)
+      toast.error(error.message || "Failed to transfer funds")
+    } finally {
+      setTransferring(false)
+    }
+  }
+
+  const formatBalance = (balance: number) => {
+    return `$${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Deposit Funds</h1>
-        <p className="text-muted-foreground">Make deposit through any of our available payment methods.</p>
+        <h1 className="text-3xl font-bold mb-2">Deposit & Transfer</h1>
+        <p className="text-muted-foreground">Deposit funds or transfer between your wallets</p>
       </div>
 
+      {/* Current Wallet Balances */}
+      <Card className="p-6 bg-card/50 border-border/40">
+        <div className="flex items-center gap-3 mb-4">
+          <Wallet className="w-6 h-6 text-primary" />
+          <h2 className="text-xl font-semibold">Current Balances</h2>
+          <Badge variant="outline" className="ml-auto">
+            {currentWallet?.account_type === 'demo' ? 'Demo Account' : 'Live Account'}
+          </Badge>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {transferOptions.map((wallet) => (
+            <Card key={wallet.id} className="p-4 bg-background/30 border-border/30">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <wallet.icon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">{wallet.name}</h3>
+                  <p className="text-xs text-muted-foreground">{wallet.description}</p>
+                </div>
+              </div>
+              <p className="text-2xl font-bold">
+                {formatBalance(getCurrentBalance(wallet.id))}
+              </p>
+              <Badge variant="secondary" className="mt-2">
+                Available
+              </Badge>
+            </Card>
+          ))}
+        </div>
+      </Card>
+
+      {/* Payment Methods */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Payment Methods</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {paymentMethods.map((method) => {
             const IconComponent = method.icon
             return (
@@ -85,6 +270,149 @@ export default function DepositPage() {
           })}
         </div>
       </div>
+
+      {/* INTERNAL TRANSFER SECTION */}
+      {selectedMethod === "transfer" && (
+        <Card className="p-8 bg-card/50 border-border/40">
+          <div className="flex items-center gap-3 mb-6">
+            <ArrowRightLeft className="w-6 h-6 text-primary" />
+            <h3 className="text-xl font-semibold">Transfer Between Wallets</h3>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Transfer From */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="from" className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <span>From</span>
+                  <Badge variant="outline" className="text-xs">
+                    Current: {formatBalance(getCurrentBalance(transferFrom))}
+                  </Badge>
+                </Label>
+                <Select value={transferFrom} onValueChange={setTransferFrom}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source wallet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transferOptions.map((wallet) => (
+                      <SelectItem key={wallet.id} value={wallet.id}>
+                        <div className="flex items-center gap-3">
+                          <wallet.icon className="w-4 h-4" />
+                          <span>{wallet.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Transfer To */}
+              <div>
+                <Label htmlFor="to" className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <span>To</span>
+                  <Badge variant="outline" className="text-xs">
+                    Current: {formatBalance(getCurrentBalance(transferTo))}
+                  </Badge>
+                </Label>
+                <Select value={transferTo} onValueChange={setTransferTo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select destination wallet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transferOptions
+                      .filter(w => w.id !== transferFrom)
+                      .map((wallet) => (
+                        <SelectItem key={wallet.id} value={wallet.id}>
+                          <div className="flex items-center gap-3">
+                            <wallet.icon className="w-4 h-4" />
+                            <span>{wallet.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Amount & Action */}
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="amount" className="text-sm font-medium mb-2">
+                  Amount (USD)
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={getCurrentBalance(transferFrom)}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="pl-8"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Available: {formatBalance(getCurrentBalance(transferFrom))}
+                </p>
+              </div>
+
+              {/* Quick Amount Buttons */}
+              <div className="grid grid-cols-4 gap-2">
+                {[100, 500, 1000, 5000].map((preset) => (
+                  <Button
+                    key={preset}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAmount(preset.toString())}
+                    disabled={preset > getCurrentBalance(transferFrom)}
+                  >
+                    ${preset}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Transfer Button */}
+              <Button
+                onClick={handleTransfer}
+                disabled={transferring || !amount || parseFloat(amount) <= 0 || transferFrom === transferTo}
+                className="w-full py-3 text-base font-semibold gap-2"
+              >
+                {transferring ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Transferring...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="w-4 h-4" />
+                    Transfer Funds
+                  </>
+                )}
+              </Button>
+
+              {/* Transfer Rules */}
+              <Card className="p-4 bg-muted/30 border-border/30">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Important Transfer Rules:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>• Withdrawals only allowed from Total Balance</li>
+                      <li>• Bot profits must be moved to Total Balance first</li>
+                      <li>• Trading profits can be moved to Total Balance</li>
+                      <li>• Transfers are instant and free</li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Cryptocurrency Selection */}
       {selectedMethod === "crypto" && (
@@ -223,7 +551,7 @@ export default function DepositPage() {
       )}
 
       {/* Regular Payment Card (for non-crypto methods) */}
-      {selectedMethod !== "crypto" && (
+      {selectedMethod !== "transfer" && selectedMethod !== "crypto" && (
         <Card className="p-8 bg-card/50 border-border/40">
           <h3 className="text-xl font-semibold mb-6">Deposit Amount</h3>
 

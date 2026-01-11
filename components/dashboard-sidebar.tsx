@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
-
+import { useAuth } from "@/lib/auth-context" // Import your auth context
+import { useRouter,} from "next/navigation"
 // Dynamically import icons to reduce initial bundle size
 const IconComponents = {
   LayoutDashboard: dynamic(() => import("lucide-react").then(mod => mod.LayoutDashboard), { ssr: false }),
@@ -52,6 +53,9 @@ export function DashboardSidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const pathname = usePathname()
+   const router = useRouter()
+  // Get signOut from your auth context
+  const { signOut, user } = useAuth()
 
   // Set mounted state
   useEffect(() => {
@@ -100,6 +104,19 @@ export function DashboardSidebar() {
       return pathname === "/dashboard"
     }
     return pathname.startsWith(href)
+  }
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    try {
+      await signOut() // Use the signOut from your auth context
+      // No need to redirect manually - your auth context should handle this
+      // Close mobile sidebar if open
+      router.push("/login")
+      setIsMobileOpen(false)
+    } catch (error) {
+      console.error("Sign out error:", error)
+    }
   }
 
   // Don't render until mounted to avoid hydration mismatch
@@ -174,8 +191,11 @@ export function DashboardSidebar() {
           )}
         </div>
 
+        {/* User Info Section - Shows when user is logged in */}
+    
+
         {/* Navigation Links - Optimized */}
-        <div className="h-[calc(100vh-128px)] overflow-y-auto">
+        <div className="h-[calc(100vh-128px-80px)] overflow-y-auto">
           <nav className="space-y-1 px-3 py-4">
             {sidebarLinks.map((link) => {
               const IconComponent = IconComponents[link.icon as keyof typeof IconComponents]
@@ -208,13 +228,11 @@ export function DashboardSidebar() {
         </div>
 
         {/* Sign Out - Fixed at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-sidebar-border bg-sidebar">
+        <div className="absolute bottom-0 pointer left-0 right-0 p-3 border-t border-sidebar-border bg-sidebar">
           <button
-            onClick={() => {
-              localStorage.removeItem("authToken")
-              window.location.href = "/"
-            }}
+            onClick={handleSignOut}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors justify-start"
+            disabled={!user} // Disable if no user is logged in
           >
             <IconComponents.LogOut className="w-5 h-5 flex-shrink-0" />
             <span className="text-sm font-medium">Sign Out</span>

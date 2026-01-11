@@ -356,11 +356,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signOut = async () => {
-    console.log("🚪 [AuthContext] Signing out...")
-    await supabase.auth.signOut()
-    // State will be cleared by the onAuthStateChange listener
-  }
+const signOut = async () => {
+  console.log("🚪 [AuthContext] Signing out...")
+  
+  // Clear state FIRST
+  setUser(null)
+  setUserProfile(null)
+  setWallets(null)
+  setUserPlans(null)
+  setTransactions(null)
+  setCurrentWallet(null)
+  setActivePlan(null)
+  
+  // Then sign out from Supabase
+  await supabase.auth.signOut()
+  
+  console.log("✅ [AuthContext] Sign out complete")
+}
 
   const refreshUser = async () => {
     console.log("🔄 [AuthContext] Refreshing user...")
