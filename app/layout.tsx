@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/lib/theme-provider"
 import { AuthProvider } from "@/lib/auth-context"
+import { ClientProviders } from "./provider"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -47,10 +48,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`font-sans antialiased bg-background text-foreground`}>
-        <AuthProvider>
-          <ThemeProvider>{children}</ThemeProvider>
-        </AuthProvider>
-        <Analytics />
+       
+          <ClientProviders>{children}</ClientProviders>
+      
       </body>
     </html>
   )

@@ -116,7 +116,7 @@ export const creditUserWallet = async (
       .insert({
         user_id: userId,
         account_type: accountType,
-        type: 'admin_credit',
+        type: 'deposit',
         amount: amount,
         description: description || 'Admin credit',
         status: 'completed',
@@ -137,7 +137,7 @@ export const creditUserWallet = async (
         title: 'Account Credited',
         message: `Admin credited your ${accountType} account with $${amount.toFixed(2)}`,
         type: 'credit',
-        is_read: false,
+        read: false,
         created_at: new Date().toISOString()
       })
 
