@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Bell, ChevronDown, Moon, Sun, User, LogOut } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export function DashboardNavbar() {
   const { 
@@ -15,10 +16,66 @@ export function DashboardNavbar() {
     signOut 
   } = useAuth()
   
-  const [notificationCount, setNotificationCount] = useState(3)
+  const [notificationCount, setNotificationCount] = useState(0)
   const [theme, setTheme] = useState("dark")
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false)
+
+  const supabase = createClient()
+
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!user) {
+      setNotificationCount(0)
+      return
+    }
+
+    const fetchUnreadCount = async () => {
+      try {
+        // Using count query with your exact database structure
+        const { count, error } = await supabase
+          .from("notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("read", false)  // Your column is 'read' (boolean)
+
+        if (error) {
+          console.error("Error fetching notification count:", error)
+          return
+        }
+
+        console.log("📊 Unread notifications count:", count)
+        setNotificationCount(count || 0)
+      } catch (error) {
+        console.error("Error fetching notifications:", error)
+      }
+    }
+
+    fetchUnreadCount()
+
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',  // Listen to all changes (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log("🔔 Notification change detected:", payload)
+          // Refresh notification count when notifications change
+          fetchUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user, supabase])
 
   const handleThemeToggle = () => {
     const newTheme = theme === "dark" ? "light" : "dark"
@@ -69,6 +126,31 @@ export function DashboardNavbar() {
       .slice(0, 2)
   }
 
+  // Mark all notifications as read when clicking bell
+  const handleBellClick = async (e: React.MouseEvent) => {
+    if (notificationCount > 0) {
+      try {
+        // Mark all as read in database
+        const { error } = await supabase
+          .from("notifications")
+          .update({ read: true })
+          .eq("user_id", user!.id)
+          .eq("read", false)
+
+        if (error) {
+          console.error("Error marking notifications as read:", error)
+          return
+        }
+
+        // Update local state
+        setNotificationCount(0)
+        console.log("✅ All notifications marked as read")
+      } catch (error) {
+        console.error("Error:", error)
+      }
+    }
+  }
+
   return (
     <>
       <nav className="sticky top-0 z-30 bg-card border-b border-border h-16 px-4 md:px-6 flex items-center transition-all duration-300">
@@ -77,9 +159,8 @@ export function DashboardNavbar() {
         <div className="hidden md:block flex-1">
           <p className="text-sm text-muted-foreground">Account Balance</p>
           <p className="text-2xl font-bold text-foreground font-mono tabular-nums">
-            {isSwitchingAccount ? "Switching..." : accountBalance}
+            { accountBalance}
           </p>
-      
         </div>
 
         {/* Center - Account Switcher */}
@@ -105,19 +186,20 @@ export function DashboardNavbar() {
           <div className="md:hidden text-right">
             <p className="text-xs text-muted-foreground">Balance</p>
             <p className="text-lg font-bold font-mono">
-              {isSwitchingAccount ? "..." : accountBalance}
+              {accountBalance}
             </p>
           </div>
 
-          {/* Notification Bell */}
+          {/* Notification Bell with real count */}
           <Link
             href="/dashboard/notifications"
             className="relative p-2 rounded-lg hover:bg-background transition-all flex-shrink-0"
-            aria-label="Notifications"
+            aria-label={`${notificationCount} unread notifications`}
+            onClick={handleBellClick}
           >
             <Bell className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
             {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white text-xs rounded-full flex items-center justify-center font-semibold">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white text-xs rounded-full flex items-center justify-center font-semibold animate-pulse">
                 {notificationCount > 9 ? "9+" : notificationCount}
               </span>
             )}
@@ -228,6 +310,19 @@ export function DashboardNavbar() {
               >
                 <span className="w-4 h-4 text-center">✓</span>
                 <span>KYC Verification</span>
+              </Link>
+              <Link 
+                href="/dashboard/notifications" 
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-background transition-colors"
+                onClick={() => setShowProfileMenu(false)}
+              >
+                <Bell className="w-4 h-4" />
+                <span>Notifications</span>
+                {notificationCount > 0 && (
+                  <span className="ml-auto bg-destructive text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {notificationCount > 9 ? "9+" : notificationCount}
+                  </span>
+                )}
               </Link>
               <Link 
                 href="/dashboard/settings" 
