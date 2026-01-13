@@ -1,169 +1,193 @@
-// app/dashboard/bot-trading/page.tsx
+// app/dashboard/trading/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
-  Bot, Play, Pause, StopCircle, TrendingUp, TrendingDown, 
-  DollarSign, BarChart3, Zap, Settings, RefreshCw,
-  AlertCircle, Clock, Target, Shield
+  TrendingUp, TrendingDown, Search, DollarSign, Clock, 
+  ArrowUpRight, ArrowDownRight, X, BarChart3, Target,
+  AlertCircle, CheckCircle2, RefreshCw, PieChart
 } from "lucide-react"
 import { toast } from "sonner"
 import { 
-  createBotTrade, 
-  stopBotTrade, 
-  getActiveBotTrades, 
-  getBotTradingBalance,
-  pauseBotTrade,
-  resumeBotTrade
-} from "@/components/action/bot-trading"
+  executeTrade, 
+  getOpenTrades, 
+  closeTrade, 
+  getTradingBalance 
+} from "@/components/action/trading"
 
-// Trading assets for bot trading
-const tradingAssets = [
-  { symbol: "BTCUSD", name: "Bitcoin", category: "crypto" as const, volatility: "High" },
-  { symbol: "ETHUSD", name: "Ethereum", category: "crypto" as const, volatility: "High" },
-  { symbol: "AAPL", name: "Apple Inc.", category: "stocks" as const, volatility: "Medium" },
-  { symbol: "MSFT", name: "Microsoft", category: "stocks" as const, volatility: "Medium" },
-  { symbol: "TSLA", name: "Tesla", category: "stocks" as const, volatility: "High" },
-  { symbol: "EURUSD", name: "Euro/USD", category: "forex" as const, volatility: "Low" },
-  { symbol: "GBPUSD", name: "Pound/USD", category: "forex" as const, volatility: "Low" },
-]
+// Trading assets
+const tradingAssets = {
+  stocks: [
+    { symbol: "AAPL", name: "Apple Inc.", volatility: "Medium", spread: "0.01%" },
+    { symbol: "MSFT", name: "Microsoft", volatility: "Low", spread: "0.02%" },
+    { symbol: "GOOGL", name: "Google", volatility: "Medium", spread: "0.015%" },
+    { symbol: "AMZN", name: "Amazon", volatility: "High", spread: "0.03%" },
+    { symbol: "TSLA", name: "Tesla", volatility: "High", spread: "0.05%" },
+    { symbol: "META", name: "Meta", volatility: "Medium", spread: "0.02%" },
+  ],
+  crypto: [
+    { symbol: "BTCUSD", name: "Bitcoin", volatility: "High", spread: "0.1%" },
+    { symbol: "ETHUSD", name: "Ethereum", volatility: "High", spread: "0.15%" },
+    { symbol: "BNBUSD", name: "Binance Coin", volatility: "High", spread: "0.2%" },
+  ],
+  forex: [
+    { symbol: "EURUSD", name: "Euro/US Dollar", volatility: "Low", spread: "0.0001" },
+    { symbol: "GBPUSD", name: "British Pound/US Dollar", volatility: "Low", spread: "0.0002" },
+    { symbol: "USDJPY", name: "US Dollar/Yen", volatility: "Low", spread: "0.0003" },
+  ]
+}
 
-// Trading strategies
-const tradingStrategies = [
-  { id: 'scalping', name: 'Scalping', description: 'Fast trades, small profits', risk: 'High' },
-  { id: 'swing', name: 'Swing Trading', description: 'Medium-term positions', risk: 'Medium' },
-  { id: 'martingale', name: 'Martingale', description: 'Double after losses', risk: 'Very High' },
-  { id: 'trend', name: 'Trend Following', description: 'Follow market trends', risk: 'Low' },
-]
-
-export default function BotTradingPage() {
+export default function ManualTradingPage() {
   const { currentWallet, userProfile, refreshAllData } = useAuth()
-  const [selectedAsset, setSelectedAsset] = useState<(typeof tradingAssets)[0] | null>(null)
-  const [selectedStrategy, setSelectedStrategy] = useState('scalping')
-  const [botTrades, setBotTrades] = useState<any[]>([])
-  const [botBalance, setBotBalance] = useState<number>(0)
+  const [selectedCategory, setSelectedCategory] = useState<"stocks" | "crypto" | "forex">("stocks")
+  const [selectedAsset, setSelectedAsset] = useState<(typeof tradingAssets.stocks)[0] | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [openTrades, setOpenTrades] = useState<any[]>([])
+  const [tradingBalance, setTradingBalance] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   
-  // Bot configuration
-  const [botConfig, setBotConfig] = useState({
-    riskPercent: 2,
-    takeProfit: 5,
-    stopLoss: 2,
-    leverage: 1,
-    maxPositionSize: 1000,
-    tradingHours: '24/7' as const,
-  })
+  // Order form state
+  const [orderType, setOrderType] = useState<"market" | "limit">("market")
+  const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy")
+  const [quantity, setQuantity] = useState<string>("1")
+  const [limitPrice, setLimitPrice] = useState<string>("")
+  const [stopLoss, setStopLoss] = useState<string>("")
+  const [takeProfit, setTakeProfit] = useState<string>("")
 
   useEffect(() => {
-    loadBotData()
-    // Auto-refresh every 15 seconds
-    const interval = setInterval(loadBotData, 15000)
+    loadData()
+    // Refresh every 10 seconds
+    const interval = setInterval(loadData, 10000)
     return () => clearInterval(interval)
   }, [])
 
-  const loadBotData = async () => {
+  const loadData = async () => {
     if (refreshing) return
     
     try {
       setRefreshing(true)
       const [trades, balance] = await Promise.all([
-        getActiveBotTrades(),
-        getBotTradingBalance()
+        getOpenTrades(),
+        getTradingBalance()
       ])
-      setBotTrades(trades || [])
-      setBotBalance(balance || 0)
-    } catch (error: any) {
-      console.error('Failed to load bot data:', error)
-      toast.error(error.message || "Failed to load bot data")
+      setOpenTrades(trades || [])
+      setTradingBalance(balance || 0)
+    } catch (error) {
+      console.error('Failed to load trading data:', error)
     } finally {
       setRefreshing(false)
     }
   }
 
-  const handleStartBotTrade = async () => {
+  const currentAssets = tradingAssets[selectedCategory]
+  const filteredAssets = currentAssets.filter(
+    asset => asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             asset.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Calculate order details
+  const currentPrice = selectedAsset ? getSimulatedPrice(selectedAsset.symbol, selectedCategory) : 0
+  const executionPrice = orderType === 'market' ? currentPrice : parseFloat(limitPrice) || currentPrice
+  const orderAmount = parseFloat(quantity) * executionPrice
+  const maxQuantity = tradingBalance / executionPrice
+
+  const handleExecuteTrade = async () => {
     if (!selectedAsset) {
-      toast.error("Please select a trading asset")
+      toast.error("Please select an asset to trade")
       return
     }
 
-    if (botBalance <= 0) {
-      toast.error("No bot trading balance available")
+    if (!quantity || parseFloat(quantity) <= 0) {
+      toast.error("Please enter a valid quantity")
+      return
+    }
+
+    if (orderType === 'limit' && (!limitPrice || parseFloat(limitPrice) <= 0)) {
+      toast.error("Please enter a valid limit price")
+      return
+    }
+
+    if (orderSide === 'buy' && orderAmount > tradingBalance) {
+      toast.error(`Insufficient trading balance. Available: $${tradingBalance.toFixed(2)}`)
       return
     }
 
     setLoading(true)
     try {
-      await createBotTrade(
-        selectedAsset.symbol,
-        selectedAsset.category,
-        selectedStrategy as any,
-        botConfig
+      const result = await executeTrade({
+        symbol: selectedAsset.symbol,
+        category: selectedCategory,
+        side: orderSide,
+        orderType: orderType,
+        quantity: parseFloat(quantity),
+        price: orderType === 'limit' ? parseFloat(limitPrice) : undefined,
+        amount: orderAmount,
+        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined
+      })
+
+      toast.success(
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-green-500" />
+          Trade executed successfully!
+        </div>
       )
-      
-      toast.success(`Bot started trading ${selectedAsset.symbol} with ${selectedStrategy} strategy`)
-      await loadBotData()
+
+      // Reset form
+      setQuantity("1")
+      setLimitPrice("")
+      setStopLoss("")
+      setTakeProfit("")
+
+      // Refresh data
+      await loadData()
       await refreshAllData?.()
     } catch (error: any) {
-      toast.error(error.message || "Failed to start bot trade")
+      toast.error(
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500" />
+          {error.message || "Failed to execute trade"}
+        </div>
+      )
     } finally {
       setLoading(false)
     }
   }
 
-  const handleStopBotTrade = async (botTradeId: string) => {
+  const handleCloseTrade = async (tradeId: string) => {
     try {
-      const result = await stopBotTrade(botTradeId)
-      const message = result.profitLoss >= 0 
-        ? `Bot trade stopped with profit of $${result.profitLoss.toFixed(2)}`
-        : `Bot trade stopped with loss of $${Math.abs(result.profitLoss).toFixed(2)}`
+      const result = await closeTrade(tradeId)
+      const message = result.profitLoss >= 0
+        ? `Trade closed with profit of $${result.profitLoss.toFixed(2)}`
+        : `Trade closed with loss of $${Math.abs(result.profitLoss).toFixed(2)}`
       
       toast.success(message)
-      await loadBotData()
+      await loadData()
       await refreshAllData?.()
     } catch (error: any) {
-      toast.error(error.message || "Failed to stop bot trade")
+      toast.error(error.message || "Failed to close trade")
     }
   }
 
-  const handlePauseBotTrade = async (botTradeId: string) => {
-    try {
-      await pauseBotTrade(botTradeId)
-      toast.success("Bot trade paused")
-      await loadBotData()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to pause bot trade")
-    }
-  }
-
-  const handleResumeBotTrade = async (botTradeId: string) => {
-    try {
-      await resumeBotTrade(botTradeId)
-      toast.success("Bot trade resumed")
-      await loadBotData()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to resume bot trade")
-    }
-  }
-
-  // Calculate stats
-  const totalAllocated = botTrades.reduce((sum, trade) => sum + (trade.metadata?.allocated_balance || 0), 0)
-  const totalProfitLoss = botTrades.reduce((sum, trade) => sum + (trade.profit_loss || 0), 0)
-  const activeBotsCount = botTrades.length
+  const totalProfitLoss = openTrades.reduce((sum, trade) => sum + (trade.profit_loss || 0), 0)
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Bot Trading</h1>
-          <p className="text-muted-foreground">Automated trading with AI-powered strategies</p>
+          <h1 className="text-3xl font-bold mb-2">Manual Trading</h1>
+          <p className="text-muted-foreground">Execute trades manually with advanced order types</p>
         </div>
         <Button 
-          onClick={loadBotData} 
+          onClick={loadData} 
           variant="outline" 
           disabled={refreshing}
           className="flex items-center gap-2"
@@ -173,334 +197,349 @@ export default function BotTradingPage() {
         </Button>
       </div>
 
-      {/* Account Status Bar */}
-      <Card className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Bot className="w-6 h-6 text-primary" />
-            </div>
+      {/* Trading Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Trading Account</p>
-              <p className="text-lg font-semibold">
-                {userProfile?.account_type === 'demo' ? 'Demo Account' : 'Live Account'}
-                {userProfile?.account_type === 'demo' && (
-                  <span className="ml-2 text-xs px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500">
-                    Practice Mode
-                  </span>
-                )}
-              </p>
+              <p className="text-sm text-muted-foreground">Trading Balance</p>
+              <p className="text-2xl font-bold">${tradingBalance.toFixed(2)}</p>
             </div>
+            <DollarSign className="w-8 h-8 text-primary/50" />
           </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Bot Balance</p>
-              <p className="text-2xl font-bold text-primary">${botBalance.toFixed(2)}</p>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Open Trades</p>
+              <p className="text-2xl font-bold">{openTrades.length}</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Active Bots</p>
-              <p className="text-2xl font-bold">{activeBotsCount}</p>
-            </div>
-            <div className="text-right">
+            <BarChart3 className="w-8 h-8 text-primary/50" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm text-muted-foreground">Total P&L</p>
               <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 ${totalProfitLoss.toFixed(2)}
               </p>
             </div>
+            <PieChart className="w-8 h-8 text-primary/50" />
           </div>
-        </div>
-      </Card>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Account Type</p>
+              <p className="text-2xl font-bold capitalize">{userProfile?.account_type || 'demo'}</p>
+            </div>
+            <Target className="w-8 h-8 text-primary/50" />
+          </div>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Create New Bot */}
+        {/* Left Column - Market & Order Form */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Asset Selection */}
+          {/* Market Selector */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Target className="w-5 h-5" />
-                Select Trading Asset
-              </h3>
-              <span className="text-sm text-muted-foreground">{tradingAssets.length} assets available</span>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {tradingAssets.map((asset) => (
-                <button
-                  key={asset.symbol}
-                  onClick={() => setSelectedAsset(asset)}
-                  className={`p-4 rounded-lg border transition-all ${
-                    selectedAsset?.symbol === asset.symbol
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-semibold text-left">{asset.symbol}</h4>
-                      <p className="text-sm text-muted-foreground text-left">{asset.name}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      asset.volatility === 'High' ? 'bg-red-500/10 text-red-500' :
-                      asset.volatility === 'Medium' ? 'bg-yellow-500/10 text-yellow-500' :
-                      'bg-green-500/10 text-green-500'
-                    }`}>
-                      {asset.volatility}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{asset.category}</span>
-                    {selectedAsset?.symbol === asset.symbol && (
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          {/* Strategy Selection */}
-          <Card className="p-6">
-            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5" />
-              Select Trading Strategy
-            </h3>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {tradingStrategies.map((strategy) => (
-                <button
-                  key={strategy.id}
-                  onClick={() => setSelectedStrategy(strategy.id)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    selectedStrategy === strategy.id
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-semibold">{strategy.name}</h4>
-                      <p className="text-sm text-muted-foreground mt-1">{strategy.description}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      strategy.risk === 'Very High' ? 'bg-red-500/10 text-red-500' :
-                      strategy.risk === 'High' ? 'bg-orange-500/10 text-orange-500' :
-                      strategy.risk === 'Medium' ? 'bg-yellow-500/10 text-yellow-500' :
-                      'bg-green-500/10 text-green-500'
-                    }`}>
-                      {strategy.risk} Risk
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          {/* Bot Configuration */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Bot Configuration
-              </h3>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  setBotConfig({
-                    riskPercent: 2,
-                    takeProfit: 5,
-                    stopLoss: 2,
-                    leverage: 1,
-                    maxPositionSize: 1000,
-                    tradingHours: '24/7',
-                  })
-                }}
-              >
-                Reset to Default
-              </Button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Risk Management */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium">Risk per Trade</label>
-                  <span className="text-sm text-primary">{botConfig.riskPercent}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  step="0.5"
-                  value={botConfig.riskPercent}
-                  onChange={(e) => setBotConfig({...botConfig, riskPercent: parseFloat(e.target.value)})}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              <h3 className="font-semibold text-lg">Market Watch</h3>
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search symbols..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-40 h-8"
                 />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>Conservative (1%)</span>
-                  <span>Aggressive (10%)</span>
+              </div>
+            </div>
+
+            {/* Category Tabs */}
+            <Tabs defaultValue="stocks" onValueChange={(v) => setSelectedCategory(v as any)}>
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="stocks">Stocks</TabsTrigger>
+                <TabsTrigger value="crypto">Crypto</TabsTrigger>
+                <TabsTrigger value="forex">Forex</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value={selectedCategory}>
+                <div className="grid grid-cols-2 gap-3">
+                  {filteredAssets.map((asset) => {
+                    const price = getSimulatedPrice(asset.symbol, selectedCategory)
+                    const change = (Math.random() * 4 - 2).toFixed(2)
+                    const isPositive = parseFloat(change) >= 0
+                    
+                    return (
+                      <button
+                        key={asset.symbol}
+                        onClick={() => setSelectedAsset(asset)}
+                        className={`p-4 rounded-lg border text-left transition-all ${
+                          selectedAsset?.symbol === asset.symbol
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-semibold">{asset.symbol}</h4>
+                            <p className="text-sm text-muted-foreground">{asset.name}</p>
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            asset.volatility === 'High' ? 'bg-red-500/10 text-red-500' :
+                            asset.volatility === 'Medium' ? 'bg-yellow-500/10 text-yellow-500' :
+                            'bg-green-500/10 text-green-500'
+                          }`}>
+                            {asset.volatility}
+                          </span>
+                        </div>
+                        
+                        <div className="mt-3 flex items-center justify-between">
+                          <div>
+                            <p className="text-lg font-bold">${price.toFixed(2)}</p>
+                            <p className={`text-sm flex items-center gap-1 ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                              {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {change}%
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Spread</p>
+                            <p className="text-sm">{asset.spread}</p>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
+              </TabsContent>
+            </Tabs>
+          </Card>
+
+          {/* Order Form */}
+          {selectedAsset && (
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="font-semibold text-lg">Trade {selectedAsset.symbol}</h3>
+                  <p className="text-sm text-muted-foreground">Current Price: ${currentPrice.toFixed(2)}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedAsset(null)}
+                  className="p-1 hover:bg-muted rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium block mb-2">Take Profit</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={botConfig.takeProfit}
-                      onChange={(e) => setBotConfig({...botConfig, takeProfit: parseFloat(e.target.value)})}
-                      className="w-full px-3 py-2 rounded-lg border border-input bg-background"
-                      min="1"
-                      max="50"
-                      step="0.5"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
+              <div className="space-y-6">
+                {/* Buy/Sell Selection */}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setOrderSide('buy')}
+                    className={`p-4 rounded-lg border flex items-center justify-center gap-2 ${
+                      orderSide === 'buy'
+                        ? 'border-green-500 bg-green-500/10 text-green-500'
+                        : 'border-border hover:border-green-500/50'
+                    }`}
+                  >
+                    <ArrowUpRight className="w-5 h-5" />
+                    <span className="font-semibold">Buy / Long</span>
+                  </button>
+                  <button
+                    onClick={() => setOrderSide('sell')}
+                    className={`p-4 rounded-lg border flex items-center justify-center gap-2 ${
+                      orderSide === 'sell'
+                        ? 'border-red-500 bg-red-500/10 text-red-500'
+                        : 'border-border hover:border-red-500/50'
+                    }`}
+                  >
+                    <ArrowDownRight className="w-5 h-5" />
+                    <span className="font-semibold">Sell / Short</span>
+                  </button>
                 </div>
 
+                {/* Order Type */}
                 <div>
-                  <label className="text-sm font-medium block mb-2">Stop Loss</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={botConfig.stopLoss}
-                      onChange={(e) => setBotConfig({...botConfig, stopLoss: parseFloat(e.target.value)})}
-                      className="w-full px-3 py-2 rounded-lg border border-input bg-background"
-                      min="1"
-                      max="20"
-                      step="0.5"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium block mb-2">Leverage</label>
-                <div className="flex gap-2">
-                  {[1, 3, 5, 10].map((value) => (
+                  <Label className="mb-2 block">Order Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      key={value}
-                      type="button"
-                      onClick={() => setBotConfig({...botConfig, leverage: value})}
-                      className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                        botConfig.leverage === value
-                          ? 'border-primary bg-primary text-primary-foreground'
+                      onClick={() => setOrderType('market')}
+                      className={`p-3 rounded-lg border ${
+                        orderType === 'market'
+                          ? 'border-primary bg-primary/10'
                           : 'border-border hover:border-primary/50'
                       }`}
                     >
-                      {value}x
+                      <div className="font-medium">Market Order</div>
+                      <div className="text-sm text-muted-foreground">Execute immediately</div>
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setOrderType('limit')}
+                      className={`p-3 rounded-lg border ${
+                        orderType === 'limit'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="font-medium">Limit Order</div>
+                      <div className="text-sm text-muted-foreground">At specified price</div>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Order Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="quantity" className="mb-2 block">
+                      Quantity
+                    </Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      min="0.01"
+                      step="0.01"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Max: {maxQuantity.toFixed(2)} units
+                    </p>
+                  </div>
+
+                  {orderType === 'limit' && (
+                    <div>
+                      <Label htmlFor="limitPrice" className="mb-2 block">
+                        Limit Price ($)
+                      </Label>
+                      <Input
+                        id="limitPrice"
+                        type="number"
+                        value={limitPrice}
+                        onChange={(e) => setLimitPrice(e.target.value)}
+                        min="0.0001"
+                        step="0.0001"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Risk Management */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="stopLoss" className="mb-2 block">
+                      Stop Loss (Optional)
+                    </Label>
+                    <Input
+                      id="stopLoss"
+                      type="number"
+                      value={stopLoss}
+                      onChange={(e) => setStopLoss(e.target.value)}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="takeProfit" className="mb-2 block">
+                      Take Profit (Optional)
+                    </Label>
+                    <Input
+                      id="takeProfit"
+                      type="number"
+                      value={takeProfit}
+                      onChange={(e) => setTakeProfit(e.target.value)}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+
+                {/* Order Summary */}
+                <Card className="p-4 bg-muted/30">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Execution Price</span>
+                      <span className="font-medium">${executionPrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Amount</span>
+                      <span className="font-medium">${orderAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Available Balance</span>
+                      <span className="font-medium">${tradingBalance.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-sm text-muted-foreground">Remaining Balance</span>
+                      <span className={`font-bold ${orderSide === 'buy' ? 'text-red-500' : 'text-green-500'}`}>
+                        ${(orderSide === 'buy' ? tradingBalance - orderAmount : tradingBalance + orderAmount).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Execute Button */}
+                <Button
+                  onClick={handleExecuteTrade}
+                  disabled={loading || !quantity || parseFloat(quantity) <= 0}
+                  className="w-full py-6 text-lg font-semibold"
+                  size="lg"
+                  variant={orderSide === 'buy' ? 'default' : 'destructive'}
+                >
+                  {loading ? (
+                    <>Executing Trade...</>
+                  ) : (
+                    <>
+                      {orderSide === 'buy' ? 'Buy' : 'Sell'} {selectedAsset.symbol}
+                      <span className="ml-2">${orderAmount.toFixed(2)}</span>
+                    </>
+                  )}
+                </Button>
               </div>
-
-              {/* Trading Summary */}
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <h4 className="font-medium mb-3">Trading Summary</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Available Balance:</span>
-                    <span className="font-medium">${botBalance.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Risk Amount:</span>
-                    <span className="font-medium">${(botBalance * botConfig.riskPercent / 100).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Position Size:</span>
-                    <span className="font-medium">${(botBalance * botConfig.riskPercent / 100 * botConfig.leverage).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Target Profit:</span>
-                    <span className="font-medium text-green-500">
-                      +${(botBalance * botConfig.riskPercent / 100 * botConfig.leverage * botConfig.takeProfit / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Max Loss:</span>
-                    <span className="font-medium text-red-500">
-                      -${(botBalance * botConfig.riskPercent / 100 * botConfig.leverage * botConfig.stopLoss / 100).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Start Bot Button */}
-              <Button
-                onClick={handleStartBotTrade}
-                disabled={!selectedAsset || botBalance <= 0 || loading}
-                className="w-full py-6 text-lg font-semibold"
-                size="lg"
-              >
-                {loading ? (
-                  <>Starting Bot...</>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5 mr-2" />
-                    Start Bot Trading
-                  </>
-                )}
-              </Button>
-
-              {botBalance <= 0 && (
-                <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                  <p className="text-sm text-yellow-600 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    No bot trading balance available. Transfer funds from your main balance.
-                  </p>
-                </div>
-              )}
-            </div>
-          </Card>
+            </Card>
+          )}
         </div>
 
-        {/* Right Column - Active Bots & Stats */}
+        {/* Right Column - Open Positions */}
         <div className="space-y-6">
-          {/* Active Bots */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Active Bots ({botTrades.length})
-              </h3>
+              <h3 className="font-semibold text-lg">Open Positions</h3>
               <span className="text-sm text-muted-foreground">
-                ${totalAllocated.toFixed(2)} allocated
+                {openTrades.length} position{openTrades.length !== 1 ? 's' : ''}
               </span>
             </div>
 
-            {botTrades.length === 0 ? (
+            {openTrades.length === 0 ? (
               <div className="text-center py-8">
-                <Bot className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-muted-foreground">No active bot trades</p>
-                <p className="text-sm text-muted-foreground mt-1">Start your first bot above</p>
+                <BarChart3 className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-muted-foreground">No open positions</p>
+                <p className="text-sm text-muted-foreground mt-1">Execute a trade to see it here</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {botTrades.map((trade) => (
-                  <div
-                    key={trade.id}
-                    className="p-4 rounded-lg border border-border bg-card/50"
-                  >
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                {openTrades.map((trade) => (
+                  <Card key={trade.id} className="p-4 border">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h4 className="font-semibold">{trade.symbol}</h4>
-                          <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
-                            {trade.strategy}
-                          </span>
                           <span className={`text-xs px-2 py-1 rounded-full ${
-                            trade.status === 'active' ? 'bg-green-500/10 text-green-500' :
-                            'bg-yellow-500/10 text-yellow-500'
+                            trade.side === 'buy' 
+                              ? 'bg-green-500/10 text-green-500' 
+                              : 'bg-red-500/10 text-red-500'
                           }`}>
-                            {trade.status}
+                            {trade.side.toUpperCase()}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Allocated: ${trade.metadata?.allocated_balance?.toFixed(2) || '0.00'}
+                          {trade.quantity} units @ ${trade.entry_price?.toFixed(2)}
                         </p>
                       </div>
                       <div className="text-right">
@@ -518,69 +557,83 @@ export default function BotTradingPage() {
                     </div>
 
                     <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-                      <div className="flex items-center gap-4">
-                        <span>Entry: ${trade.entry_price?.toFixed(2)}</span>
-                        <span>Current: ${trade.current_price?.toFixed(2)}</span>
-                      </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         <span>{new Date(trade.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                       </div>
+                      <div>
+                        Current: ${trade.current_price?.toFixed(2)}
+                      </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      {trade.status === 'active' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePauseBotTrade(trade.id)}
-                          className="flex-1"
-                        >
-                          <Pause className="w-3 h-3 mr-1" />
-                          Pause
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleResumeBotTrade(trade.id)}
-                          className="flex-1"
-                        >
-                          <Play className="w-3 h-3 mr-1" />
-                          Resume
-                        </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleStopBotTrade(trade.id)}
-                        className="flex-1"
-                      >
-                        <StopCircle className="w-3 h-3 mr-1" />
-                        Stop
-                      </Button>
-                    </div>
-                  </div>
+                    {trade.stop_loss && (
+                      <div className="text-xs text-red-500 mb-1">
+                        Stop Loss: ${trade.stop_loss}
+                      </div>
+                    )}
+                    {trade.take_profit && (
+                      <div className="text-xs text-green-500 mb-3">
+                        Take Profit: ${trade.take_profit}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={() => handleCloseTrade(trade.id)}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Close Position
+                    </Button>
+                  </Card>
                 ))}
               </div>
             )}
           </Card>
 
-          {/* Risk Warning */}
-          <Card className="p-6 bg-red-500/5 border-red-500/20">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-red-500 mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-red-500 mb-2">Risk Warning</h4>
-                <p className="text-sm text-muted-foreground">
-                  Bot trading involves significant risk. Past performance is not indicative of future results. 
-                  You may lose all of your allocated funds. Only trade with money you can afford to lose.
-                </p>
-              </div>
-            </div>
+          {/* Trading Tips */}
+          <Card className="p-6 bg-blue-500/5 border-blue-500/20">
+            <h4 className="font-semibold text-blue-500 mb-2">Trading Tips</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5"></div>
+                <span>Always use stop-loss orders to limit losses</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5"></div>
+                <span>Never risk more than 2% of your balance on a single trade</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5"></div>
+                <span>Have a clear entry and exit strategy before trading</span>
+              </li>
+            </ul>
           </Card>
         </div>
       </div>
     </div>
   )
+}
+
+// Helper function to simulate price
+function getSimulatedPrice(symbol: string, category: 'stocks' | 'crypto' | 'forex'): number {
+  const priceMap: Record<string, number> = {
+    'AAPL': 182.45,
+    'MSFT': 378.91,
+    'GOOGL': 139.50,
+    'AMZN': 187.23,
+    'TSLA': 242.18,
+    'META': 502.45,
+    'BTCUSD': 43250.00,
+    'ETHUSD': 2340.50,
+    'BNBUSD': 612.30,
+    'EURUSD': 1.0850,
+    'GBPUSD': 1.2730,
+    'USDJPY': 0.0067,
+  }
+  
+  const basePrice = priceMap[symbol] || 100
+  const volatility = category === 'crypto' ? 0.05 : category === 'stocks' ? 0.02 : 0.005
+  const randomChange = (Math.random() * 2 - 1) * volatility
+  
+  return basePrice * (1 + randomChange)
 }
