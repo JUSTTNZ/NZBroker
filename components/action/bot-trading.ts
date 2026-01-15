@@ -14,6 +14,9 @@ export interface BotTradeConfig {
   maxPositionSize: number;
   tradingHours: '24/7' | 'market_hours';
   autoTrade: boolean;
+  botType:string 
+  autoReinvest:any
+  tradingMode:any
 }
 
 export interface BotTrade {

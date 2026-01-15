@@ -164,7 +164,7 @@ export function DashboardNavbar() {
         </div>
 
         {/* Center - Account Switcher */}
-        <div className="flex-1 md:flex-none hidden ">
+        <div className="flex-1 md:flex-none hidden md:block">
           <div className="flex items-center justify-center">
             <select
               value={userProfile?.account_type || "demo"}
