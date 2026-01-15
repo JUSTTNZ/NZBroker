@@ -164,7 +164,7 @@ export function DashboardNavbar() {
         </div>
 
         {/* Center - Account Switcher */}
-        <div className="flex-1 md:flex-none">
+        <div className="flex-1 md:flex-none hidden ">
           <div className="flex items-center justify-center">
             <select
               value={userProfile?.account_type || "demo"}
@@ -183,7 +183,7 @@ export function DashboardNavbar() {
         <div className="flex items-center gap-2 md:gap-4 justify-end flex-1">
           
           {/* Account Balance - Mobile only */}
-          <div className="md:hidden text-right">
+          <div className="hidden text-right">
             <p className="text-xs text-muted-foreground">Balance</p>
             <p className="text-lg font-bold font-mono">
               {accountBalance}
