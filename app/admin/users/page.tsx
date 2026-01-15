@@ -114,37 +114,51 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <Card className="p-6 bg-card/50 border-border/40">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users by name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            {["all", "active", "pending", "inactive"].map((status) => (
-              <Button
-                key={status}
-                variant={statusFilter === status ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter(status)}
-              >
+   <Card className="p-4 md:p-6 bg-card/50 border-border/40">
+  <div className="flex flex-col gap-4">
+    {/* Search - Full width on mobile */}
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <Input
+        placeholder="Search users by name or email..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="pl-10 w-full"
+      />
+    </div>
+
+    {/* Status Filter - Responsive grid */}
+    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex-1">
+        <p className="text-sm font-medium mb-2 text-muted-foreground">Filter by Status</p>
+        <div className="grid grid-cols-2 sm:flex gap-2">
+          {["all", "active", "pending", "inactive"].map((status) => (
+            <Button
+              key={status}
+              variant={statusFilter === status ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(status)}
+              className="flex-1 sm:flex-initial justify-between sm:justify-center"
+            >
+              <span className="hidden sm:inline">
                 {status.charAt(0).toUpperCase() + status.slice(1)}
-                <Badge className="ml-2 bg-muted text-muted-foreground">
-                  {statusCounts[status as keyof typeof statusCounts]}
-                </Badge>
-              </Button>
-            ))}
-          </div>
-          <Button onClick={loadUsers} variant="outline" size="sm">
-            Refresh
-          </Button>
+              </span>
+              <span className="sm:hidden">
+                {status === "all" ? "All" : 
+                 status === "active" ? "Active" : 
+                 status === "pending" ? "Pending" : 
+                 "Inactive"}
+              </span>
+              <Badge className="ml-2 bg-muted text-muted-foreground text-xs">
+                {statusCounts[status as keyof typeof statusCounts]}
+              </Badge>
+            </Button>
+          ))}
         </div>
-      </Card>
+      </div>
+    </div>
+  </div>
+</Card>
 
       {/* Users Table */}
       <Card className="p-6 bg-card/50 border-border/40">

@@ -177,7 +177,7 @@ export default function CopyTradingPage() {
 
             <Button 
               className="w-full bg-primary hover:bg-primary/90"
-              onClick={() => handleCopyTrade(trader.id, trader.name)}
+              // onClick={() => handleCopyTrade(trader.id, trader.name)}
             >
               Copy Trader
             </Button>

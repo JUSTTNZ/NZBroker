@@ -3,21 +3,16 @@
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, Eye, Wallet, CreditCard, RefreshCw, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { TrendingUp, Eye, Wallet, CreditCard, ArrowUpRight, Settings, LucideSwitchCamera } from "lucide-react"
 import { ScrollingTicker } from "@/components/scrolling-ticker"
 import { AdvancedChartWidget, MiniSymbolChart, MarketOverviewWidget } from "@/components/tradingview-widgets"
 import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 
 export default function DashboardPage() {
-  const [userName, setUserName] = useState("Nz")
-  const [accountType, setAccountType] = useState("demo")
-  
-  const { user, userProfile, currentWallet, wallets, userPlans, refreshAllData, loading } = useAuth()
-  
-  console.log("DashboardPage user:", user)
-  console.log("DashboardPage userProfile:", userProfile)
-  console.log("DashboardPage currentWallet:", currentWallet)
-  console.log("DashboardPage all wallets:", wallets)
+  const { user, userProfile, currentWallet, wallets, userPlans, refreshAllData, switchAccountType } = useAuth()
+  const router = useRouter()
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false)
 
   // Calculate total profit (example - you should get this from transactions)
   const calculateTotalProfit = () => {
@@ -31,6 +26,32 @@ export default function DashboardPage() {
   const tradingBalance = currentWallet ? `$${currentWallet.trading_balance.toLocaleString()}` : "$0.00"
   const botBalance = currentWallet ? `$${currentWallet.bot_trading_balance.toLocaleString()}` : "$0.00"
   const bonusBalance = currentWallet ? `$${currentWallet.bonus_balance.toLocaleString()}` : "$0.00"
+
+  const handleAccountSwitch = async () => {
+    if (!userProfile || isSwitchingAccount) return
+    
+    setIsSwitchingAccount(true)
+    try {
+      const newAccountType = userProfile.account_type === "demo" ? "live" : "demo"
+      await switchAccountType(newAccountType)
+      // Refresh data after switching
+      await refreshAllData()
+    } catch (error) {
+      console.error("Failed to switch account:", error)
+      alert(error instanceof Error ? error.message : "Failed to switch account")
+    } finally {
+      setIsSwitchingAccount(false)
+    }
+  }
+
+  const handleNavigation = (path: string) => {
+    router.push(path)
+  }
+
+  // Find active plan
+  const activePlan = userPlans?.find(plan => plan.status === "active")
+  // Get current plan from user profile
+  const currentPlan = userProfile?.current_plan || "basic"
 
   return (
     <div className="space-y-6">
@@ -47,16 +68,19 @@ export default function DashboardPage() {
           </p>
         </div>
         
-        <Button 
-          onClick={refreshAllData}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-          disabled={loading}
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleAccountSwitch}
+            disabled={isSwitchingAccount}
+            className="flex items-center gap-2"
+          >
+            <LucideSwitchCamera className="w-4 h-4" />
+            {isSwitchingAccount ? '' : `Switch to ${userProfile?.account_type === "demo" ? "Live" : "Demo"}`}
+          </Button>
+      
+        </div>
       </div>
 
       <ScrollingTicker />
@@ -73,8 +97,13 @@ export default function DashboardPage() {
               {userProfile?.account_type || "demo"} Account
             </span>
             <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-600 capitalize">
-              {userProfile?.current_plan || "basic"} Plan
+              {currentPlan || "Basic"} Plan
             </span>
+            {activePlan && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-600">
+                Active
+              </span>
+            )}
           </div>
         </div>
         
@@ -190,45 +219,79 @@ export default function DashboardPage() {
             <Card className="p-4 border-border/40">
               <h3 className="font-semibold mb-3">Quick Actions</h3>
               <div className="grid grid-cols-2 gap-3">
-                <Button className="h-12 bg-primary hover:bg-primary/90">
+                <Button 
+                  className="h-12 bg-primary hover:bg-primary/90"
+                  onClick={() => handleNavigation('/dashboard/deposit')}
+                >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Deposit
                 </Button>
-                <Button className="h-12 bg-green-600 hover:bg-green-700">
+                <Button 
+                  className="h-12 bg-green-600 hover:bg-green-700"
+                  onClick={() => handleNavigation('/dashboard/withdraw')}
+                >
                   <ArrowUpRight className="w-4 h-4 mr-2" />
                   Withdraw
                 </Button>
-                <Button className="h-12 bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  className="h-12 bg-blue-600 hover:bg-blue-700"
+                  onClick={() => handleNavigation('/dashboard/stock-trade')}
+                >
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Start Trade
                 </Button>
-                <Button className="h-12 bg-purple-600 hover:bg-purple-700">
+                <Button 
+                  className="h-12 bg-purple-600 hover:bg-purple-700"
+                  onClick={() => handleNavigation('/dashboard/analysis-bot')}
+                >
                   <span className="mr-2">🤖</span>
                   Auto Trade
                 </Button>
               </div>
               
-              {/* Plan Info */}
-              {userPlans && userPlans.length > 0 && (
-                <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <h4 className="font-medium text-sm mb-2">Current Plan</h4>
-                  {userPlans
-                    .filter(plan => plan.status === "active")
-                    .map(plan => (
-                      <div key={plan.id} className="flex justify-between items-center">
-                        <div>
-                          <p className="font-bold capitalize">{plan.plan}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Active until {new Date(plan.ends_at!).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button size="sm" variant="outline">
-                          Upgrade
-                        </Button>
-                      </div>
-                    ))}
+              {/* Plan Info - Simplified */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-bold text-lg capitalize">{currentPlan} Plan</h4>
+                    {activePlan ? (
+                      <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        ✓ Active Plan
+                      </p>
+                    ) : (
+                      <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                        No active subscription
+                      </p>
+                    )}
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleNavigation('/dashboard/upgrade')}
+                  >
+                    {activePlan ? "Upgrade" : "Get Plan"}
+                  </Button>
                 </div>
-              )}
+                
+                <div className="text-sm text-muted-foreground">
+                  <p>Account type: <span className="font-medium capitalize">{userProfile?.account_type || "demo"}</span></p>
+                  
+                  {activePlan && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Renews:</span>
+                        <span className="font-medium">
+                          {activePlan.ends_at ? new Date(activePlan.ends_at).toLocaleDateString() : "Never"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm mt-1">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className="font-medium capitalize text-green-600">{activePlan.status}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </Card>
           </div>
         )}
@@ -284,18 +347,21 @@ export default function DashboardPage() {
             title: "Start Trading",
             desc: `Trade with your ${tradingBalance} trading balance`,
             btn: "Trade Now",
+            path: "/trade"
           },
           {
             icon: Eye,
             title: "Market Signals",
             desc: "View AI-powered trading signals and analysis",
             btn: "View Signals",
+            path: "/signals"
           },
           {
             icon: TrendingUp,
             title: "Copy Trading",
             desc: "Copy successful traders and earn alongside them",
             btn: "Learn More",
+            path: "/copy-trading"
           },
         ].map((action, i) => {
           const Icon = action.icon
@@ -308,7 +374,10 @@ export default function DashboardPage() {
               <Icon className="w-8 h-8 text-primary mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors">{action.title}</h3>
               <p className="text-sm text-muted-foreground mb-4">{action.desc}</p>
-              <Button className="w-full bg-primary hover:bg-primary/90 active:scale-95 transition-all">
+              <Button 
+                className="w-full bg-primary hover:bg-primary/90 active:scale-95 transition-all"
+                onClick={() => handleNavigation(action.path)}
+              >
                 {action.btn}
               </Button>
             </Card>

@@ -134,17 +134,15 @@ export function DashboardSidebar() {
   return (
     <>
       {/* Mobile toggle button - Minimal */}
-      <button
-        aria-label="Toggle mobile menu"
-        className="lg:hidden fixed top-4 left-4 z-[100] p-2 rounded-lg bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-transform"
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-      >
-        {isMobileOpen ? (
-          <IconComponents.X className="w-5 h-5" />
-        ) : (
-          <IconComponents.Menu className="w-5 h-5" />
-        )}
-      </button>
+{!isMobileOpen && (
+  <button
+    aria-label="Toggle mobile menu"
+    className="lg:hidden fixed top-4 left-4 z-[100] p-2 rounded-lg bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-transform"
+    onClick={() => setIsMobileOpen(!isMobileOpen)}
+  >
+    <IconComponents.Menu className="w-5 h-5" />
+  </button>
+)}
 
       {/* Sidebar - Optimized */}
       <aside
