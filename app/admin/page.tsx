@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { 
@@ -9,37 +10,130 @@ import {
   MessageSquare,
   TrendingUp,
   ArrowUpRight,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  User
 } from "lucide-react"
 import Link from "next/link"
+import { fetchAllUsers, AdminUser } from "@/lib/admin"
+import { toast } from "sonner"
+import { useAuth } from "@/lib/auth-context"
 
 export default function AdminDashboardPage() {
-  const stats = [
-    { label: "Total Users", value: "1,248", change: "+12%", icon: Users, color: "text-blue-500" },
-    { label: "Pending Approvals", value: "24", change: "3 new", icon: Clock, color: "text-yellow-500" },
-    { label: "Pending Withdrawals", value: "18", change: "$42.5K", icon: DollarSign, color: "text-orange-500" },
-    { label: "Active Support", value: "8", change: "2 urgent", icon: MessageSquare, color: "text-green-500" },
-  ]
+  const { user } = useAuth()
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  const recentActivities = [
-    { user: "John Doe", action: "Registration pending", time: "10 min ago", type: "user" },
-    { user: "Jane Smith", action: "Withdrawal requested", time: "30 min ago", type: "withdrawal" },
-    { user: "Bob Johnson", action: "Large deposit", time: "1 hour ago", type: "transaction" },
-    { user: "Alice Brown", action: "Support ticket opened", time: "2 hours ago", type: "support" },
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true)
+      const data = await fetchAllUsers()
+      setUsers(data)
+    } catch (error) {
+      console.error('Failed to load users:', error)
+      toast.error('Failed to load user data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const refreshData = async () => {
+    setRefreshing(true)
+    await loadUsers()
+    setRefreshing(false)
+    toast.success('Data refreshed')
+  }
+
+  // Calculate stats from real data
+  const totalUsers = users.length
+  const activeUsers = users.filter(u => u.status === 'active').length
+  const pendingUsers = users.filter(u => u.status === 'pending').length
+  
+  const totalDemoBalance = users.reduce((sum, user) => 
+    sum + (user.wallets.find(w => w.account_type === 'demo')?.total_balance || 0), 0)
+  
+  const totalLiveBalance = users.reduce((sum, user) => 
+    sum + (user.wallets.find(w => w.account_type === 'live')?.total_balance || 0), 0)
+  
+  const totalBalance = totalDemoBalance + totalLiveBalance
+
+  // Recent activities from actual users
+  const recentActivities = users.slice(0, 4).map(user => ({
+    user: user.full_name || user.email,
+    action: `Registered ${user.account_type} account`,
+    time: new Date(user.created_at).toLocaleDateString(),
+    type: 'user'
+  }))
+
+  const stats = [
+    { 
+      label: "Total Users", 
+      value: totalUsers.toString(), 
+      change: `+${users.filter(u => {
+        const userDate = new Date(u.created_at)
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        return userDate > weekAgo
+      }).length} new`, 
+      icon: Users, 
+      color: "text-blue-500" 
+    },
+    { 
+      label: "Active Users", 
+      value: activeUsers.toString(), 
+      change: `${((activeUsers / totalUsers) * 100).toFixed(0)}% active`, 
+      icon: TrendingUp, 
+      color: "text-green-500" 
+    },
+    { 
+      label: "Total Balance", 
+      value: `$${totalBalance.toLocaleString()}`, 
+      change: `Demo: $${totalDemoBalance.toLocaleString()}`, 
+      icon: DollarSign, 
+      color: "text-orange-500" 
+    },
+    { 
+      label: "Pending Actions", 
+      value: pendingUsers.toString(), 
+      change: pendingUsers > 0 ? "Needs review" : "All clear", 
+      icon: Clock, 
+      color: "text-yellow-500" 
+    },
   ]
 
   const quickActions = [
-    { title: "Review Users", desc: "Approve new registrations", link: "/dashboard/admin/users", icon: Users },
-    { title: "Approve Withdrawals", desc: "Process pending requests", link: "/dashboard/admin/withdrawals", icon: DollarSign },
-    { title: "Support Tickets", desc: "Respond to users", link: "/dashboard/admin/support", icon: MessageSquare },
+    { title: "Manage Users", desc: "View and manage all users", link: "/admin/users", icon: Users },
+    { title: "Credit Users", desc: "Add funds to user accounts", link: "/admin/credit", icon: DollarSign },
+    { title: "System Logs", desc: "View platform activities", link: "##", icon: MessageSquare },
   ]
 
   return (
     <div className="space-y-6">
-      {/* Welcome */}
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Overview of platform activities and quick actions</p>
+      {/* Welcome Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <div className="w-10 h-10 md:text-lg text-sm rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="w-5 h-5 text-primary " />
+            </div>
+            Welcome back, Admin {user?.email?.split('@')[0] || 'Admin'}!
+          </h1>
+          <p className="text-muted-foreground">Platform overview and management dashboard</p>
+        </div>
+        {/* <Button 
+          variant="outline" 
+          size="sm"
+          onClick={refreshData}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button> */}
       </div>
 
       {/* Stats Grid */}
@@ -86,31 +180,39 @@ export default function AdminDashboardPage() {
         {/* Recent Activities */}
         <Card className="p-6 bg-card/50 border-border/40">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Recent Activities</h3>
-            <Link href="/dashboard/admin/transactions" className="text-sm text-primary hover:underline">
-              View All
+            <h3 className="text-lg font-semibold">Recent User Registrations</h3>
+            <Link href="/admin/users" className="text-sm text-primary hover:underline">
+              View All Users
             </Link>
           </div>
           <div className="space-y-4">
-            {recentActivities.map((activity, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    activity.type === 'user' ? 'bg-blue-500/10 text-blue-500' :
-                    activity.type === 'withdrawal' ? 'bg-orange-500/10 text-orange-500' :
-                    activity.type === 'support' ? 'bg-green-500/10 text-green-500' :
-                    'bg-purple-500/10 text-purple-500'
-                  }`}>
-                    <TrendingUp className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium">{activity.user}</p>
-                    <p className="text-sm text-muted-foreground">{activity.action}</p>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">{activity.time}</p>
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading users...</p>
               </div>
-            ))}
+            ) : recentActivities.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No recent activities</p>
+              </div>
+            ) : (
+              recentActivities.map((activity, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      activity.type === 'user' ? 'bg-blue-500/10 text-blue-500' :
+                      'bg-purple-500/10 text-purple-500'
+                    }`}>
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{activity.user}</p>
+                      <p className="text-sm text-muted-foreground">{activity.action}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{activity.time}</p>
+                </div>
+              ))
+            )}
           </div>
         </Card>
 
@@ -121,18 +223,31 @@ export default function AdminDashboardPage() {
             <h3 className="text-lg font-semibold">System Alerts</h3>
           </div>
           <div className="space-y-4">
-            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="font-medium text-yellow-600 mb-1">High Withdrawal Volume</p>
-              <p className="text-sm text-yellow-700">Multiple large withdrawals pending approval</p>
-            </div>
-            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="font-medium text-blue-600 mb-1">New User Registration</p>
-              <p className="text-sm text-blue-700">5 new users awaiting verification</p>
-            </div>
+            {pendingUsers > 0 && (
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="font-medium text-yellow-600 mb-1">Pending User Approvals</p>
+                <p className="text-sm text-yellow-700">{pendingUsers} user(s) need review</p>
+              </div>
+            )}
+            
+            {users.length === 0 && (
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="font-medium text-blue-600 mb-1">No Users Found</p>
+                <p className="text-sm text-blue-700">The platform has no registered users yet</p>
+              </div>
+            )}
+
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <p className="font-medium text-green-600 mb-1">System Update</p>
-              <p className="text-sm text-green-700">Scheduled maintenance in 24 hours</p>
+              <p className="font-medium text-green-600 mb-1">Platform Status</p>
+              <p className="text-sm text-green-700">All systems operational</p>
             </div>
+
+            {totalBalance < 100000 && (
+              <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                <p className="font-medium text-orange-600 mb-1">Low Platform Balance</p>
+                <p className="text-sm text-orange-700">Total balance: ${totalBalance.toLocaleString()}</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>

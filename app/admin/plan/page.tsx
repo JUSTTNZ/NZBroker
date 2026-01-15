@@ -305,37 +305,44 @@ export default function PlanRequestsPage() {
       </div>
 
       {/* Filters */}
-      <Card className="p-6 bg-card/50 border-border/40">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, email, or plan..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            {["all", "pending", "approved", "rejected"].map((status) => (
-              <Button
-                key={status}
-                variant={statusFilter === status ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter(status as any)}
-              >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-                <Badge className="ml-2 bg-muted text-muted-foreground">
-                  {requests.filter(r => status === "all" || r.status === status).length}
-                </Badge>
-              </Button>
-            ))}
-          </div>
-          <Button onClick={loadPlanRequests} variant="outline" size="sm">
-            Refresh
-          </Button>
-        </div>
-      </Card>
+   <Card className="p-4 md:p-6 bg-card/50 border-border/40">
+  <div className="flex flex-col gap-4">
+    {/* Search */}
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <Input
+        placeholder="Search..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="pl-10 w-full"
+      />
+    </div>
+
+    {/* Scrollable Filter Buttons */}
+    <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:overflow-visible md:mx-0 md:px-0">
+      {["all", "pending", "approved", "rejected"].map((status) => (
+        <Button
+          key={status}
+          variant={statusFilter === status ? "default" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter(status as any)}
+          className="whitespace-nowrap flex-shrink-0"
+        >
+          <span className="hidden xs:inline capitalize">{status}</span>
+          <span className="xs:hidden">
+            {status === "all" ? "All" : 
+             status === "pending" ? "Pending" : 
+             status === "approved" ? "Approved" : 
+             "Rejected"}
+          </span>
+          <Badge className="ml-2 bg-muted text-muted-foreground text-xs">
+            {requests.filter(r => status === "all" || r.status === status).length}
+          </Badge>
+        </Button>
+      ))}
+    </div>
+  </div>
+</Card>
 
       {/* Requests Table */}
       <Card className="p-6 bg-card/50 border-border/40">
