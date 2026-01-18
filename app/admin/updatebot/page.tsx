@@ -431,7 +431,7 @@ export default function UpdateBotProgressPage() {
               <CardContent className="space-y-6">
                 {/* Bot Control Actions */}
                 <div className="flex gap-2">
-                  <Button
+                  {/* <Button
                     variant="outline"
                     onClick={() => handleBotAction('pause', selectedBot.id)}
                     disabled={updating === selectedBot.id}
@@ -439,7 +439,7 @@ export default function UpdateBotProgressPage() {
                   >
                     <Pause className="w-4 h-4 mr-2" />
                     Pause Bot
-                  </Button>
+                  </Button> */}
                   <Button
                     variant="destructive"
                     onClick={() => handleBotAction('stop', selectedBot.id)}

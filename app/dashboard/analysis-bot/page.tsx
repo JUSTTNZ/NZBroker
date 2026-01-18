@@ -108,9 +108,9 @@ export default function BotTradingPage() {
   ): number {
     const basePercentage = calculateProfitPercentageForAmount(investment)
     const modeMultiplier = {
-      'conservative': 1,
-      'balanced': 1.5,
-      'aggressive': 2
+      'conservative': 100,
+      'balanced': 300,
+      'aggressive': 500
     }[tradingMode] || 1
     
     const baseProfit = (investment * basePercentage) / 100
@@ -466,9 +466,9 @@ const handleStartBotTrade = async () => {
                   <label className="font-medium block mb-3">Trading Intensity</label>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { mode: 'conservative', label: 'Conservative', desc: 'Lower risk', multiplier: '1x' },
-                      { mode: 'balanced', label: 'Balanced', desc: 'Medium risk', multiplier: '1.5x' },
-                      { mode: 'aggressive', label: 'Aggressive', desc: 'Higher reward', multiplier: '2x' },
+                      { mode: 'conservative', label: 'Conservative', desc: 'Lower risk', multiplier: '10x' },
+                      { mode: 'balanced', label: 'Balanced', desc: 'Medium risk', multiplier: '30x' },
+                      { mode: 'aggressive', label: 'Aggressive', desc: 'Higher reward', multiplier: '50x' },
                     ].map(({ mode, label, desc, multiplier }) => (
                       <button
                         key={mode}
@@ -577,8 +577,8 @@ const handleStartBotTrade = async () => {
                       <span>Mode Boost ({config.tradingMode}):</span>
                       <span className="font-medium">
                         {
-                          config.tradingMode === 'conservative' ? '1x' :
-                          config.tradingMode === 'balanced' ? '1.5x' : '2x'
+                          config.tradingMode === 'conservative' ? '10x' :
+                          config.tradingMode === 'balanced' ? '30x' : '50x'
                         }
                       </span>
                     </div>
@@ -613,7 +613,7 @@ const handleStartBotTrade = async () => {
                 ) : (
                   <>
                     <Rocket className="w-5 h-5 mr-2" />
-                    Launch 7-Day Trading Bot
+                    Launch Trading Bot
                   </>
                 )}
               </Button>
@@ -626,99 +626,129 @@ const handleStartBotTrade = async () => {
             </Card>
 
             {/* Active Bots */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold">Active Bots</h3>
-                  <p className="text-sm text-muted-foreground">{activeBotsCount} bots running</p>
+         <Card className="p-6">
+  <div className="flex items-center justify-between mb-6">
+    <div>
+      <h3 className="text-lg font-semibold">Active Bots</h3>
+      <p className="text-sm text-muted-foreground">{activeBotsCount} bots running</p>
+    </div>
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={loadBotData}
+      disabled={refreshing}
+    >
+      <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+    </Button>
+  </div>
+
+  {botTrades.length === 0 ? (
+    <div className="text-center py-8">
+      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+        <Bot className="w-6 h-6 text-muted-foreground" />
+      </div>
+      <p className="text-muted-foreground">No active bots</p>
+      <p className="text-sm text-muted-foreground mt-1">Launch your first bot to start earning</p>
+    </div>
+  ) : (
+    <div className="space-y-4">
+      {botTrades.map((trade) => {
+        const profit = Math.max(0, trade.profit_loss || 0)
+        const allocatedBalance = trade.metadata?.allocated_balance || 0
+        const expectedProfit = trade.metadata?.expectedProfit || 0
+        const progress = trade.metadata?.progress || 0
+        
+        // FIXED: Calculate days correctly
+        const startDate = trade.metadata?.startDate ? new Date(trade.metadata.startDate) : new Date(trade.created_at)
+        const endDate = trade.metadata?.endDate ? new Date(trade.metadata.endDate) : new Date(startDate)
+        endDate.setDate(startDate.getDate() + 7) // Add 7 days to start date
+        
+        const now = new Date()
+        
+        // Calculate total days in the bot duration (always 7 days)
+        const totalDays = 7
+        
+        // Calculate days passed (cannot be negative or exceed total days)
+        const timePassed = Math.max(0, now.getTime() - startDate.getTime())
+        const daysPassed = Math.min(totalDays, timePassed / (1000 * 60 * 60 * 24))
+        
+        // Calculate days remaining (cannot be negative)
+        const timeRemaining = Math.max(0, endDate.getTime() - now.getTime())
+        const daysRemaining = timeRemaining / (1000 * 60 * 60 * 24)
+        
+        // Current day number (1-7)
+        const currentDay = Math.min(7, Math.max(1, Math.ceil(daysPassed)))
+        
+        // Format days remaining nicely
+        const formatDaysRemaining = () => {
+          if (daysRemaining <= 0) return 'Completed'
+          if (daysRemaining < 1) {
+            const hours = Math.ceil(daysRemaining * 24)
+            return `${hours} hour${hours !== 1 ? 's' : ''}`
+          }
+          if (daysRemaining < 2) return '1 day'
+          return `${Math.floor(daysRemaining)} days`
+        }
+        
+        return (
+          <div
+            key={trade.id}
+            className="p-4 rounded-lg border border-border"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-semibold">{trade.symbol}</h4>
+                  <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
+                    Active
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    {trade.metadata?.botType || 'trend'} Bot
+                  </Badge>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={loadBotData}
-                  disabled={refreshing}
-                >
-                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Invested: ${allocatedBalance.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Day {currentDay} of 7
+                </p>
               </div>
+              <div className="text-right">
+                <p className="text-lg font-bold text-green-500">+${profit.toFixed(2)}</p>
+                <p className="text-sm text-green-500">
+                  +{((profit / allocatedBalance) * 100 || 0).toFixed(2)}%
+                </p>
+              </div>
+            </div>
 
-              {botTrades.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-                    <Bot className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground">No active bots</p>
-                  <p className="text-sm text-muted-foreground mt-1">Launch your first bot to start earning</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {botTrades.map((trade) => {
-                    const profit = Math.max(0, trade.profit_loss || 0)
-                    const allocatedBalance = trade.metadata?.allocated_balance || 0
-                    const expectedProfit = trade.metadata?.expectedProfit || 0
-                    const progress = trade.metadata?.progress || 0
-                    const daysPassed = trade.metadata?.current_progress_days || 0
-                    const daysRemaining = trade.metadata?.days_remaining || 7
-                    
-                    return (
-                      <div
-                        key={trade.id}
-                        className="p-4 rounded-lg border border-border"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold">{trade.symbol}</h4>
-                              <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                                Active
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {trade.metadata?.botType || 'trend'} Bot
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Invested: ${allocatedBalance.toFixed(2)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Day {daysPassed + 1} of 7
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-green-500">+${profit.toFixed(2)}</p>
-                            <p className="text-sm text-green-500">
-                              +{((profit / allocatedBalance) * 100 || 0).toFixed(2)}%
-                            </p>
-                          </div>
-                        </div>
+            {/* Progress Bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>Progress: {progress.toFixed(1)}%</span>
+                <span>Expected: ${expectedProfit.toFixed(2)}</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>{formatDaysRemaining()} remaining</span>
+                <span>${(allocatedBalance + expectedProfit).toFixed(2)} at completion</span>
+              </div>
+            </div>
 
-                        {/* Progress Bar */}
-                        <div className="mb-4">
-                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span>Progress: {progress.toFixed(1)}%</span>
-                            <span>Expected: ${expectedProfit.toFixed(2)}</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
-                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                            <span>{daysRemaining} days remaining</span>
-                            <span>${(allocatedBalance + expectedProfit).toFixed(2)} at completion</span>
-                          </div>
-                        </div>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStopBotTrade(trade.id)}
-                          className="w-full"
-                        >
-                          <StopCircle className="w-4 h-4 mr-2" />
-                          Stop Bot & Take Profit
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </Card>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleStopBotTrade(trade.id)}
+              className="w-full"
+            >
+              <StopCircle className="w-4 h-4 mr-2" />
+              Stop Bot & Take Profit
+            </Button>
+          </div>
+        )
+      })}
+    </div>
+  )}
+</Card>
 
             {/* Earning Explanation */}
             <Card className="p-6 bg-gradient-to-br from-green-50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/10 border-green-200 dark:border-green-800">
