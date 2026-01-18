@@ -63,7 +63,7 @@ interface BotTrade {
 
 export default function UpdateBotProgressPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+//   const searchParams = useSearchParams()
   const supabase = createClient()
   const [runningBots, setRunningBots] = useState<BotTrade[]>([])
   const [selectedBot, setSelectedBot] = useState<BotTrade | null>(null)
@@ -125,15 +125,6 @@ export default function UpdateBotProgressPage() {
 
       setRunningBots(botTradesWithProfiles)
 
-      // Check if specific bot is requested via URL
-      const botId = searchParams.get('botId')
-      if (botId && botTradesWithProfiles.length > 0) {
-        const bot = botTradesWithProfiles.find(b => b.id === botId)
-        if (bot) {
-          setSelectedBot(bot)
-          setProgressValue(bot.metadata?.progress || 0)
-        }
-      }
 
     } catch (error) {
       console.error('[UpdateBotProgress] Error:', error)
@@ -141,7 +132,7 @@ export default function UpdateBotProgressPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, searchParams])
+  }, [supabase, ])
 
   // Load bots on mount
   useEffect(() => {
