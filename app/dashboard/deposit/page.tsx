@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,8 +11,6 @@ import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { 
-  CreditCard, 
-  Zap, 
   DollarSign, 
   Copy, 
   Check, 
@@ -39,32 +37,40 @@ export default function DepositPage() {
   
   const supabase = createClient()
 
+  // Payment methods - only internal transfer and crypto
   const paymentMethods = [
     { id: "transfer", name: "Internal Transfer", icon: ArrowRightLeft, desc: "Move funds between wallets" },
     { id: "crypto", name: "Cryptocurrency", icon: DollarSign, desc: "External deposit" },
-    { id: "card", name: "Credit Card", icon: CreditCard, desc: "External deposit" },
-    { id: "bank", name: "Bank Transfer", icon: Zap, desc: "1-2 business days" },
   ]
 
+  // Same wallet addresses used for both funding section and crypto deposit
+  const walletAddresses = {
+    eth: "0x74d0cb9b52ED68f69980899b19c42Ee9B9eCB72C",
+    btc: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    usdt: "TKrjq7L8x2dY7vq1V2nTqP3k4M5n6B7v8C9d0E1f2G3",
+  }
+
+  // Cryptocurrencies - removed solana
   const cryptoCurrencies = [
     { id: "eth", name: "Ethereum (ETH)", symbol: "ETH", icon: "Ξ" },
     { id: "btc", name: "Bitcoin (BTC)", symbol: "BTC", icon: "₿" },
     { id: "usdt", name: "Tether (USDT)", symbol: "USDT", icon: "₮" },
-    { id: "solana", name: "Solana (SOL)", symbol: "SOL", icon: "◎" },
   ]
-
-  const cryptoWallets = {
-    eth: "0x74d0cb9b52ED68f69980899b19c42Ee9B9eCB72C",
-    btc: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-    usdt: "TKrjq7L8x2dY7vq1V2nTqP3k4M5n6B7v8C9d0E1f2G3",
-    solana: "So1anaWaL1etAddR3ss1234567890ABCDEFGHIJKLM",
-  }
 
   const transferOptions = [
     { id: "total", name: "Total Balance", icon: Wallet, description: "Main wallet balance" },
     { id: "trading", name: "Trading Balance", icon: TrendingUp, description: "For manual trading" },
     { id: "bot", name: "Bot Trading Balance", icon: Bot, description: "For auto trading" },
   ]
+
+  // User wallet addresses for funding section - using the same addresses
+  const userWalletAddresses = [
+    { currency: "USDT", address: walletAddresses.usdt, network: "ERC20", symbol: "USDT" },
+    { currency: "ETH", address: walletAddresses.eth, network: "Ethereum", symbol: "ETH" },
+    { currency: "BTC", address: walletAddresses.btc, network: "Bitcoin", symbol: "BTC" },
+  ]
+  
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
 
   const getCurrentBalance = (walletType: string) => {
     if (!currentWallet) return 0
@@ -77,10 +83,11 @@ export default function DepositPage() {
     }
   }
 
-  const handleCopyWallet = (wallet: string) => {
+  const handleCopyWallet = (wallet: string, currency: string) => {
     navigator.clipboard.writeText(wallet)
-    setWalletCopied(true)
-    setTimeout(() => setWalletCopied(false), 2000)
+    setCopiedAddress(currency)
+    toast.success(`${currency} address copied!`)
+    setTimeout(() => setCopiedAddress(null), 2000)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,9 +185,11 @@ export default function DepositPage() {
         read: false,
         created_at: new Date().toISOString()
       })
- if(notificationError){
-  console.warn("Notification error:", notificationError)
- }
+      
+      if(notificationError){
+        console.warn("Notification error:", notificationError)
+      }
+      
       // Refresh data
       await refreshAllData()
       
@@ -207,6 +216,82 @@ export default function DepositPage() {
         <h1 className="text-3xl font-bold mb-2">Deposit & Transfer</h1>
         <p className="text-muted-foreground">Deposit funds or transfer between your wallets</p>
       </div>
+
+      {/* WALLET ADDRESSES FOR FUNDING - Add this section */}
+      {currentWallet?.account_type === 'live' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Wallet Addresses for Funding</h2>
+            <Badge className="bg-green-500">Live Account</Badge>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {userWalletAddresses.map((wallet) => (
+              <Card key={wallet.currency} className="p-4 border border-gray-200 dark:border-gray-800">
+                <div className="flex items-center gap-3 mb-4">
+                  <Wallet className="w-5 h-5 text-green-500" />
+                  <div>
+                    <h3 className="font-semibold">Pay to this {wallet.currency} Wallet</h3>
+                    <p className="text-sm text-gray-500">For admin to fund your live account</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Wallet Address */}
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-medium">Wallet Address:</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopyWallet(wallet.address, wallet.currency)}
+                        className="h-8 px-2"
+                      >
+                        {copiedAddress === wallet.currency ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                        <span className="sr-only">Copy</span>
+                      </Button>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                      <p className="font-mono text-sm break-all text-gray-700 dark:text-gray-300">
+                        {wallet.address}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Network Info */}
+                  <div className="text-center">
+                    <Badge variant="outline" className="text-xs">
+                      Network: {wallet.network}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Notice */}
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                      Send only {wallet.symbol} to this address. After payment, contact support with transaction details.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* General Notice */}
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Important:</strong> Send funds to any wallet above, then contact support with the transaction ID. 
+              Your account will be credited within 5-30 minutes after confirmation.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Current Wallet Balances */}
       <Card className="p-6 bg-card/50 border-border/40">
@@ -244,7 +329,7 @@ export default function DepositPage() {
       {/* Payment Methods */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Payment Methods</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {paymentMethods.map((method) => {
             const IconComponent = method.icon
             return (
@@ -418,7 +503,7 @@ export default function DepositPage() {
       {selectedMethod === "crypto" && (
         <Card className="p-6 bg-card/50 border-border/40">
           <h3 className="text-xl font-semibold mb-4">Select Cryptocurrency</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {cryptoCurrencies.map((crypto) => (
               <Card
                 key={crypto.id}
@@ -456,7 +541,7 @@ export default function DepositPage() {
                 <h4 className="font-medium mb-4">QR Code</h4>
                 <div className="inline-block p-4 bg-white rounded-lg">
                   <QRCode 
-                    value={cryptoWallets[selectedCrypto as keyof typeof cryptoWallets]} 
+                    value={walletAddresses[selectedCrypto as keyof typeof walletAddresses]} 
                     size={200}
                   />
                 </div>
@@ -470,12 +555,17 @@ export default function DepositPage() {
                 <div className="p-4 bg-background/50 rounded-lg border border-border/40">
                   <div className="flex items-center justify-between">
                     <p className="font-mono text-sm break-all">
-                      {cryptoWallets[selectedCrypto as keyof typeof cryptoWallets]}
+                      {walletAddresses[selectedCrypto as keyof typeof walletAddresses]}
                     </p>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopyWallet(cryptoWallets[selectedCrypto as keyof typeof cryptoWallets])}
+                      onClick={() => {
+                        navigator.clipboard.writeText(walletAddresses[selectedCrypto as keyof typeof walletAddresses])
+                        setWalletCopied(true)
+                        toast.success(`${selectedCrypto.toUpperCase()} address copied!`)
+                        setTimeout(() => setWalletCopied(false), 2000)
+                      }}
                       className="ml-2 shrink-0"
                     >
                       {walletCopied ? (
@@ -546,43 +636,6 @@ export default function DepositPage() {
 
           <Button className="w-full bg-primary hover:bg-primary/90 py-3 text-base font-semibold mt-6">
             Confirm Deposit
-          </Button>
-        </Card>
-      )}
-
-      {/* Regular Payment Card (for non-crypto methods) */}
-      {selectedMethod !== "transfer" && selectedMethod !== "crypto" && (
-        <Card className="p-8 bg-card/50 border-border/40">
-          <h3 className="text-xl font-semibold mb-6">Deposit Amount</h3>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Amount (USD)</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="1,000"
-                className="w-full pl-8 pr-4 py-3 rounded-lg bg-background/50 border border-border/40 focus:border-primary/50 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            {[100, 500, 1000, 5000].map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setAmount(preset.toString())}
-                className="p-3 rounded-lg bg-background/50 border border-border/40 hover:border-primary/50 transition-colors text-sm font-medium"
-              >
-                ${preset}
-              </button>
-            ))}
-          </div>
-
-          <Button className="w-full bg-primary hover:bg-primary/90 py-3 text-base font-semibold">
-            Continue to Payment
           </Button>
         </Card>
       )}
