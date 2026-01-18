@@ -68,7 +68,7 @@ export default function CreditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Credit User Accounts</h1>
+        <h1 className="md:text-3xl text-lg font-bold mb-2">Credit User Accounts</h1>
         <p className="text-muted-foreground">Add funds to user demo or live accounts</p>
       </div>
 

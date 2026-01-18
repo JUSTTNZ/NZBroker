@@ -14,7 +14,9 @@ import {
   LogOut,
   Menu,
   X,
-  Home
+  Home,
+  BotIcon,
+  
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -22,6 +24,8 @@ const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/credit", label: "Credit Users", icon: CreditCard },
+  { href: "/admin/bot", label: "Bot Trading", icon: BotIcon },
+  { href: "/admin/updatebot", label: "Update Bot", icon: BotIcon },
   { href: "/admin/plan", label: "Plans", icon: CreditCard },
   { href: "/admin/withdrawals", label: "Withdrawals", icon: CreditCard },
   { href: "/admin/support", label: "Customer Support", icon: MessageSquare },
