@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 
@@ -16,6 +16,7 @@ interface UserProfile {
   demo_balance: number
   live_balance: number
   plan_expires_at: string | null
+  kyc_status: "not_started" | "pending" | "under_review" | "approved" | "rejected"
   created_at: string
   updated_at: string
 }
@@ -84,13 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentWallet, setCurrentWallet] = useState<Wallet | null>(null)
   const [activePlan, setActivePlan] = useState<UserPlan | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
-  // Function to fetch ALL user data
-  const fetchAllUserData = async (userId: string) => {
+  // Use ref to store supabase client - prevents re-renders
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
+
+  // Function to fetch ALL user data - memoized with useCallback
+  const fetchAllUserData = useCallback(async (userId: string) => {
     try {
-      console.log("📊 [AuthContext] Fetching ALL data for user:", userId)
-      
       // Fetch all data in parallel for better performance
       const [
         { data: profile, error: profileError },
@@ -100,99 +102,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).single(),
         supabase.from("wallets").select("*").eq("user_id", userId).order("account_type"),
-        supabase.from("user_plans").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(20)
+        supabase.from("user_plans").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
+        supabase.from("transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10)
       ])
 
-      // Set profile
-      if (profileError) {
-        console.error("❌ [AuthContext] Profile fetch error:", profileError)
-        setUserProfile(null)
-      } else {
-        console.log("✅ [AuthContext] Profile loaded")
+      // Batch state updates to reduce re-renders
+      if (!profileError && profile) {
         setUserProfile(profile as UserProfile)
       }
 
-      // Set wallets
-      if (walletsError) {
-        console.error("❌ [AuthContext] Wallets fetch error:", walletsError)
-        setWallets(null)
-        setCurrentWallet(null)
-      } else {
-        console.log("✅ [AuthContext] Wallets loaded:", userWallets?.length || 0)
+      if (!walletsError && userWallets) {
         setWallets(userWallets as Wallet[])
-        
-        // Set current wallet based on user's account_type
         const profileAccountType = (profile as UserProfile)?.account_type || "demo"
         const current = userWallets?.find((w: any) => w.account_type === profileAccountType)
         setCurrentWallet(current || userWallets?.[0] || null)
       }
 
-      // Set user plans
-      if (plansError) {
-        console.error("❌ [AuthContext] Plans fetch error:", plansError)
-        setUserPlans(null)
-        setActivePlan(null)
-      } else {
-        console.log("✅ [AuthContext] Plans loaded:", plans?.length || 0)
+      if (!plansError && plans) {
         setUserPlans(plans as UserPlan[])
-        
-        // Find active plan
         const active = plans?.find((p: any) => p.status === "active")
         setActivePlan(active || null)
       }
 
-      // Set transactions
-      if (transactionsError) {
-        console.error("❌ [AuthContext] Transactions fetch error:", transactionsError)
-        setTransactions(null)
-      } else {
-        console.log("✅ [AuthContext] Transactions loaded:", userTransactions?.length || 0)
+      if (!transactionsError && userTransactions) {
         setTransactions(userTransactions as Transaction[])
       }
-
     } catch (error) {
-      console.error("💥 [AuthContext] Error fetching all user data:", error)
+      console.error("Error fetching user data:", error)
     }
-  }
+  }, [supabase])
 
   // Initialize auth and fetch data
   useEffect(() => {
+    let mounted = true
+
     const initializeAuth = async () => {
       try {
-        console.log("🔄 [AuthContext] Initializing auth...")
-        
-        // Get current user
-        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
-        
-        if (userError) {
-          console.error("❌ [AuthContext] User fetch error:", userError)
-        } else {
-          console.log("👤 [AuthContext] User found:", currentUser?.id)
-          setUser(currentUser)
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
 
+        if (mounted) {
+          setUser(currentUser)
           if (currentUser) {
-            await fetchAllUserData(currentUser.id)
+            fetchAllUserData(currentUser.id)
           }
+          setLoading(false)
         }
       } catch (error) {
-        console.error("[AuthContext] Initialization error:", error)
-      } finally {
-        setLoading(false)
-        console.log("✅ [AuthContext] Auth initialization complete")
+        if (mounted) setLoading(false)
       }
     }
 
     initializeAuth()
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 [AuthContext] Auth state changed:", event, session?.user?.id)
-      
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+
       setUser(session?.user || null)
 
       if (session?.user) {
-        await fetchAllUserData(session.user.id)
+        fetchAllUserData(session.user.id)
       } else {
         // Clear all data when user logs out
         setUserProfile(null)
@@ -204,41 +173,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    return () => subscription?.unsubscribe()
-  }, [supabase])
+    return () => {
+      mounted = false
+      subscription?.unsubscribe()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-   const signUp = async (email: string, password: string, fullName: string) => {
-  console.log("🔵 [AuthContext] Starting signup...")
-  
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
   // 1. Create auth user
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: {
-        full_name: fullName,
-      },
+      data: { full_name: fullName },
     },
   })
 
-  if (error) {
-    console.error("❌ [AuthContext] Auth error:", error)
-    throw error
-  }
+  if (error) throw error
+  if (!data.user) throw new Error("User creation failed")
 
-  if (!data.user) {
-    console.error("❌ [AuthContext] No user created")
-    throw new Error("User creation failed")
-  }
+  const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  console.log("✅ [AuthContext] Auth user created:", data.user.id)
-
-  // 2. Create profile with NEW schema
-  console.log("🔄 [AuthContext] Creating profile...")
-  const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-  
-  const { error: profileError } = await supabase.from("profiles").insert([
-    {
+  // 2. Create profile, wallets, and plan in parallel for speed
+  await Promise.all([
+    supabase.from("profiles").insert({
       id: data.user.id,
       email,
       full_name: fullName,
@@ -247,21 +206,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       account_type: "demo",
       demo_balance: 10000.00,
       live_balance: 0.00,
-      plan_expires_at: planExpiresAt, // Set expiry date
-    },
-  ])
-
-  if (profileError) {
-    console.error("❌ [AuthContext] Profile error:", profileError)
-    throw profileError
-  }
-
-  console.log("✅ [AuthContext] Profile created")
-
-  // 3. Create user_plan record
-  console.log("🔄 [AuthContext] Creating user plan record...")
-  const { error: planError } = await supabase.from("user_plans").insert([
-    {
+      plan_expires_at: planExpiresAt,
+    }),
+    supabase.from("user_plans").insert({
       user_id: data.user.id,
       plan: "basic",
       amount_paid: 0.00,
@@ -269,49 +216,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status: "active",
       starts_at: new Date().toISOString(),
       ends_at: planExpiresAt,
-    },
-  ])
-
-  if (planError) {
-    console.error("❌ [AuthContext] User plan error:", planError)
-    // Don't throw - just log this error
-  } else {
-    console.log("✅ [AuthContext] User plan created")
-  }
-
-  // 4. Create wallets
-  console.log("🔄 [AuthContext] Creating wallets...")
-  const { error: demoWalletError } = await supabase.from("wallets").insert([
-    {
-      user_id: data.user.id,
-      account_type: "demo",
-      total_balance: 10000.00,
-      trading_balance: 5000.00,
-      bot_trading_balance: 5000.00,
-      bonus_balance: 10000.00,
-    },
-  ])
-
-  const { error: liveWalletError } = await supabase.from("wallets").insert([
-    {
-      user_id: data.user.id,
-      account_type: "live",
-      total_balance: 0.00,
-      trading_balance: 0.00,
-      bot_trading_balance: 0.00,
-    },
-  ])
-
-  if (demoWalletError || liveWalletError) {
-    console.error("❌ [AuthContext] Wallet errors:", { demoWalletError, liveWalletError })
-  } else {
-    console.log("✅ [AuthContext] Wallets created")
-  }
-
-  // 5. Record bonus transaction
-  console.log("🔄 [AuthContext] Recording bonus transaction...")
-  const { error: transactionError } = await supabase.from("transactions").insert([
-    {
+    }),
+    supabase.from("wallets").insert([
+      {
+        user_id: data.user.id,
+        account_type: "demo",
+        total_balance: 10000.00,
+        trading_balance: 5000.00,
+        bot_trading_balance: 5000.00,
+        bonus_balance: 10000.00,
+      },
+      {
+        user_id: data.user.id,
+        account_type: "live",
+        total_balance: 0.00,
+        trading_balance: 0.00,
+        bot_trading_balance: 0.00,
+      },
+    ]),
+    supabase.from("transactions").insert({
       user_id: data.user.id,
       account_type: "demo",
       type: "bonus",
@@ -319,28 +242,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       description: "Initial demo account bonus",
       status: "completed",
       reference_id: `BONUS_${data.user.id}_${Date.now()}`,
-    },
+    }),
   ])
 
-  if (transactionError) {
-    console.error("❌ [AuthContext] Transaction error:", transactionError)
-  } else {
-    console.log("✅ [AuthContext] Bonus transaction recorded")
-  }
-
-  // 6. Update state
   setUser(data.user)
-  
-  // 7. Fetch the created profile
-  setTimeout(() => {
-    console.log("🔄 [AuthContext] Fetching created profile...")
-    refreshUser()
-  }, 500)
+}, [supabase])
 
-  console.log("🎉 [AuthContext] Signup completed successfully")
-}
-
-const signIn = async (email: string, password: string) => {
+const signIn = useCallback(async (email: string, password: string) => {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -351,35 +259,27 @@ const signIn = async (email: string, password: string) => {
   setUser(data.user)
 
   if (data.user) {
-    // FIRST: Directly fetch the profile to get role
+    // Fetch profile to get role
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", data.user.id)
       .single()
 
-    console.log("👤 User role:", profile?.role)
-    
-    // THEN: Redirect based on role
+    // Redirect based on role
     if (profile?.role === "admin") {
-      console.log("👑 Redirecting admin to /admin")
       window.location.href = "/admin"
     } else {
-      console.log("👤 Redirecting user to /dashboard")
       window.location.href = "/dashboard"
     }
-    
-    // Optional: Fetch the rest of the data in background
-    fetchAllUserData(data.user.id).then(() => {
-      console.log("✅ Background data fetch complete")
-    })
   }
-}
+}, [supabase])
 
-const signOut = async () => {
-  console.log("🚪 [AuthContext] Signing out...")
-  
-  // Clear state FIRST
+const signOut = useCallback(async () => {
+  // Sign out from Supabase first (don't await - fire and forget)
+  supabase.auth.signOut()
+
+  // Clear state immediately
   setUser(null)
   setUserProfile(null)
   setWallets(null)
@@ -387,129 +287,85 @@ const signOut = async () => {
   setTransactions(null)
   setCurrentWallet(null)
   setActivePlan(null)
-  
-  // Then sign out from Supabase
-  await supabase.auth.signOut()
-  
-  console.log("✅ [AuthContext] Sign out complete")
-}
 
-  const refreshUser = async () => {
-    console.log("🔄 [AuthContext] Refreshing user...")
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    setUser(currentUser)
+  // Redirect to home
+  window.location.href = "/"
+}, [supabase])
 
-    if (currentUser) {
-      await fetchAllUserData(currentUser.id)
-    }
+const refreshUser = useCallback(async () => {
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  setUser(currentUser)
+  if (currentUser) {
+    fetchAllUserData(currentUser.id)
   }
+}, [supabase, fetchAllUserData])
 
-  const refreshAllData = async () => {
-    if (user) {
-      console.log("🔄 [AuthContext] Refreshing ALL data...")
-      await fetchAllUserData(user.id)
-    }
+const refreshAllData = useCallback(async () => {
+  if (user) {
+    await fetchAllUserData(user.id)
   }
+}, [user, fetchAllUserData])
 
-const switchAccountType = async (accountType: "demo" | "live") => {
+const switchAccountType = useCallback(async (accountType: "demo" | "live") => {
   if (!user || !userProfile) throw new Error("No user logged in")
-  
-  console.log("⚡ [AuthContext] FAST switching to:", accountType)
-  
-  // OPTIMIZATION: Save current state in case we need to revert
-  const previousAccountType = userProfile.account_type
+
   const previousProfile = { ...userProfile }
   const previousWallet = currentWallet
-  
-  // OPTIMIZATION 1: Update UI INSTANTLY (optimistic update)
-  const updatedProfile = { 
-    ...userProfile, 
-    account_type: accountType
-  }
-  setUserProfile(updatedProfile)
-  
-  // OPTIMIZATION 2: Find and set new wallet instantly
+
+  // Optimistic update - instant UI response
+  setUserProfile({ ...userProfile, account_type: accountType })
   const newWallet = wallets?.find(w => w.account_type === accountType)
   setCurrentWallet(newWallet || null)
-  
-  console.log("⚡ [AuthContext] UI updated instantly!")
-  
+
   try {
-    // OPTIMIZATION 3: Try database update with retry logic
     const { error } = await supabase
       .from("profiles")
       .update({ account_type: accountType })
       .eq("id", user.id)
 
-    if (error) {
-      console.error("❌ [AuthContext] Database update failed:", error)
-      
-      // Check if it's the constraint error
-      if (error.message?.includes("demo_only_for_demo_accounts")) {
-        console.log("🔄 [AuthContext] Removing constraint and retrying...")
-        
-        // Option 1: Remove constraint via SQL (one-time fix)
-        // Run this in Supabase: ALTER TABLE profiles DROP CONSTRAINT IF EXISTS demo_only_for_demo_accounts;
-        
-        // Option 2: Update with proper values
-        const fixData: any = { account_type: accountType }
-        if (accountType === "live") {
-          fixData.demo_balance = 0 // Set demo balance to 0 for live accounts
-        }
-        
-        const { error: retryError } = await supabase
-          .from("profiles")
-          .update(fixData)
-          .eq("id", user.id)
-          
-        if (retryError) {
-          throw new Error(`Failed even after fix: ${retryError.message}`)
-        }
-        
-        console.log("✅ [AuthContext] Fixed and switched!")
-      } else {
-        throw error
-      }
-    }
-    
-    console.log("✅ [AuthContext] Database updated successfully")
-    
+    if (error) throw error
   } catch (error) {
-    console.error("💥 [AuthContext] Switch completely failed:", error)
-    
-    // REVERT: Go back to previous state
+    // Revert on failure
     setUserProfile(previousProfile)
     setCurrentWallet(previousWallet)
-    
-    // Show user-friendly error
-    if (error instanceof Error) {
-      if (error.message.includes("demo_only_for_demo_accounts")) {
-        throw new Error("Cannot switch to Live account because demo balance is not zero. Please contact support.")
-      }
-    }
-    
     throw error
   }
-}
+}, [supabase, user, userProfile, currentWallet, wallets])
+// Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    user,
+    userProfile,
+    wallets,
+    userPlans,
+    transactions,
+    currentWallet,
+    activePlan,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    refreshUser,
+    refreshAllData,
+    switchAccountType,
+  }), [
+    user,
+    userProfile,
+    wallets,
+    userPlans,
+    transactions,
+    currentWallet,
+    activePlan,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    refreshUser,
+    refreshAllData,
+    switchAccountType,
+  ])
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userProfile,
-        wallets,
-        userPlans,
-        transactions,
-        currentWallet,
-        activePlan,
-        loading,
-        signUp,
-        signIn,
-        signOut,
-        refreshUser,
-        refreshAllData,
-        switchAccountType,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )

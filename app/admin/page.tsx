@@ -3,30 +3,36 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { 
-  Users, 
-  Clock, 
-  DollarSign, 
+import {
+  Users,
+  Clock,
+  DollarSign,
   MessageSquare,
   TrendingUp,
   ArrowUpRight,
   AlertCircle,
   RefreshCw,
-  User
+  User,
+  FileCheck
 } from "lucide-react"
 import Link from "next/link"
 import { fetchAllUsers, AdminUser } from "@/lib/admin"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth()
+  const { user, userProfile } = useAuth()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [pendingKYC, setPendingKYC] = useState(0)
+
+  const supabase = createClient()
 
   useEffect(() => {
     loadUsers()
+    loadKYCStats()
   }, [])
 
   const loadUsers = async () => {
@@ -42,9 +48,22 @@ export default function AdminDashboardPage() {
     }
   }
 
+  const loadKYCStats = async () => {
+    try {
+      const { count } = await supabase
+        .from("kyc_verifications")
+        .select("*", { count: "exact", head: true })
+        .in("status", ["pending", "under_review"])
+
+      setPendingKYC(count || 0)
+    } catch (error) {
+      console.error('Failed to load KYC stats:', error)
+    }
+  }
+
   const refreshData = async () => {
     setRefreshing(true)
-    await loadUsers()
+    await Promise.all([loadUsers(), loadKYCStats()])
     setRefreshing(false)
     toast.success('Data refreshed')
   }
@@ -108,8 +127,8 @@ export default function AdminDashboardPage() {
 
   const quickActions = [
     { title: "Manage Users", desc: "View and manage all users", link: "/admin/users", icon: Users },
+    { title: "KYC Verifications", desc: `${pendingKYC} pending approvals`, link: "/admin/kyc", icon: FileCheck, highlight: pendingKYC > 0 },
     { title: "Credit Users", desc: "Add funds to user accounts", link: "/admin/credit", icon: DollarSign },
-    { title: "System Logs", desc: "View platform activities", link: "##", icon: MessageSquare },
   ]
 
   return (
@@ -121,7 +140,7 @@ export default function AdminDashboardPage() {
             <div className="w-10 h-10 md:text-lg text-sm rounded-full bg-primary/10 flex items-center justify-center">
               <User className="w-5 h-5 text-primary " />
             </div>
-            Welcome back, Admin {user?.email?.split('@')[0] || 'Admin'}!
+            Welcome back, {userProfile?.full_name || 'Admin'}!
           </h1>
           <p className="text-muted-foreground">Platform overview and management dashboard</p>
         </div>
@@ -160,12 +179,21 @@ export default function AdminDashboardPage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {quickActions.map((action) => {
+        {quickActions.map((action: any) => {
           const Icon = action.icon
           return (
             <Link key={action.title} href={action.link}>
-              <Card className="p-6 bg-card/50 border-border/40 hover:border-primary/50 transition-all cursor-pointer">
-                <Icon className="w-8 h-8 text-primary mb-4" />
+              <Card className={`p-6 bg-card/50 border-border/40 hover:border-primary/50 transition-all cursor-pointer ${
+                action.highlight ? "border-yellow-500/50 bg-yellow-500/5" : ""
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <Icon className={`w-8 h-8 ${action.highlight ? "text-yellow-500" : "text-primary"}`} />
+                  {action.highlight && (
+                    <span className="px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-600 rounded-full">
+                      Action Required
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-semibold text-lg mb-2">{action.title}</h3>
                 <p className="text-sm text-muted-foreground">{action.desc}</p>
                 <Button variant="ghost" className="mt-4 w-full">Go to {action.title}</Button>
@@ -223,13 +251,27 @@ export default function AdminDashboardPage() {
             <h3 className="text-lg font-semibold">System Alerts</h3>
           </div>
           <div className="space-y-4">
+            {pendingKYC > 0 && (
+              <Link href="/admin/kyc">
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-yellow-600 mb-1">Pending KYC Verifications</p>
+                      <p className="text-sm text-yellow-700">{pendingKYC} verification(s) need review</p>
+                    </div>
+                    <FileCheck className="w-6 h-6 text-yellow-500" />
+                  </div>
+                </div>
+              </Link>
+            )}
+
             {pendingUsers > 0 && (
               <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                 <p className="font-medium text-yellow-600 mb-1">Pending User Approvals</p>
                 <p className="text-sm text-yellow-700">{pendingUsers} user(s) need review</p>
               </div>
             )}
-            
+
             {users.length === 0 && (
               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <p className="font-medium text-blue-600 mb-1">No Users Found</p>
