@@ -39,7 +39,7 @@ export default function DashboardLayout({
   ])
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user,  } = useAuth()
+  const { user, loading } = useAuth()
   // useEffect(() => {
   //   // Check if user is authenticated
   //   const authToken = localStorage.getItem("authToken")
@@ -98,7 +98,7 @@ export default function DashboardLayout({
 
   const emojis = ["😊", "👍", "❤️", "🚀", "💪", "🎯", "📈", "💰", "🔥", "🤔"]
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">

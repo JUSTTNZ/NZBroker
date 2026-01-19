@@ -106,17 +106,10 @@ export function DashboardSidebar() {
     return pathname.startsWith(href)
   }
 
-  // Handle sign out
-  const handleSignOut = async () => {
-    try {
-      await signOut() // Use the signOut from your auth context
-      // No need to redirect manually - your auth context should handle this
-      // Close mobile sidebar if open
-      router.push("/login")
-      setIsMobileOpen(false)
-    } catch (error) {
-      console.error("Sign out error:", error)
-    }
+  // Handle sign out - fast, no awaiting
+  const handleSignOut = () => {
+    setIsMobileOpen(false)
+    signOut() // signOut handles redirect internally
   }
 
   // Don't render until mounted to avoid hydration mismatch

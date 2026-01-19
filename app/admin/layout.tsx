@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { 
-  LayoutDashboard, 
-  Users, 
-  CreditCard, 
-  MessageSquare, 
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  MessageSquare,
   DollarSign,
   Settings,
   Shield,
@@ -16,13 +16,14 @@ import {
   X,
   Home,
   BotIcon,
-  
+  FileCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
+  { href: "/admin/kyc", label: "KYC Verifications", icon: FileCheck },
   { href: "/admin/credit", label: "Credit Users", icon: CreditCard },
   { href: "/admin/bot", label: "Bot Trading", icon: BotIcon },
   { href: "/admin/updatebot", label: "Update Bot", icon: BotIcon },

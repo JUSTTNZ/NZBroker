@@ -98,13 +98,9 @@ export function DashboardNavbar() {
     }
   }
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      setShowProfileMenu(false)
-    } catch (error) {
-      console.error("❌ Sign out failed:", error)
-    }
+  const handleSignOut = () => {
+    setShowProfileMenu(false)
+    signOut() // signOut handles redirect internally
   }
 
   // Calculate real balance
