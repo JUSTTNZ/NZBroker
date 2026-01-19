@@ -3,16 +3,28 @@
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, Eye, Wallet, CreditCard, ArrowUpRight, Settings, LucideSwitchCamera } from "lucide-react"
+import { TrendingUp, Eye, Wallet, CreditCard, ArrowUpRight, Settings, LucideSwitchCamera, AlertCircle } from "lucide-react"
 import { ScrollingTicker } from "@/components/scrolling-ticker"
 import { AdvancedChartWidget, MiniSymbolChart, MarketOverviewWidget } from "@/components/tradingview-widgets"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+
+interface Withdrawal {
+  id: string
+  user_id: string
+  amount: number
+  status: string
+  payment_details: string
+  admin_fee: number
+  created_at: string
+}
 
 export default function DashboardPage() {
   const { user, userProfile, currentWallet, wallets, userPlans, refreshAllData, switchAccountType } = useAuth()
   const router = useRouter()
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false)
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null)
 
   // Calculate total profit (example - you should get this from transactions)
   const calculateTotalProfit = () => {
@@ -52,7 +64,32 @@ export default function DashboardPage() {
   const activePlan = userPlans?.find(plan => plan.status === "active")
   // Get current plan from user profile
   const currentPlan = userProfile?.current_plan || "basic"
-
+useEffect(() => {
+  const fetchPendingWithdrawal = async () => {
+    if (!user) return
+    
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("withdrawals")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "payment_pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+      
+      if (data && data.length > 0) {
+        setPendingWithdrawal(data[0])
+      } else {
+        setPendingWithdrawal(null)
+      }
+    } catch (error) {
+      console.error("Error fetching pending withdrawal:", error)
+    }
+  }
+  
+  fetchPendingWithdrawal()
+}, [user])
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -82,6 +119,50 @@ export default function DashboardPage() {
       
         </div>
       </div>
+      {pendingWithdrawal && (
+  <Card className="p-4 md:p-6 bg-red-500/10 border-red-500/30 animate-fade-in-up mb-6">
+    <div className="flex items-start gap-3">
+      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <h3 className="font-semibold text-red-500 mb-2">Payment Instructions Required</h3>
+        <p className="text-sm text-red-600 mb-3">
+          You have a pending withdrawal of <span className="font-bold">${pendingWithdrawal.amount.toLocaleString()}</span> that requires payment. 
+          Please follow the instructions below to complete your withdrawal:
+        </p>
+        
+        <div className="bg-white/50 dark:bg-black/50 p-3 rounded border border-red-500/20">
+          <p className="text-sm font-medium text-red-500 mb-2">Payment Details:</p>
+          <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">
+            {pendingWithdrawal.payment_details}
+          </p>
+          
+          {pendingWithdrawal.admin_fee > 0 && (
+            <div className="mt-3 pt-3 border-t border-red-500/20">
+              <p className="text-sm font-medium text-red-500 mb-1">Payment Summary:</p>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+              
+                <div className="flex justify-between col-span-2 pt-1 border-t border-red-500/10">
+                  <span className="text-red-600 font-medium">Total to Pay:</span>
+                  <span className="font-bold text-lg text-red-700">
+                    ${pendingWithdrawal.admin_fee.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        
+        <p className="text-xs text-red-500/80 mt-3">
+          ⚠️ Your withdrawal will be processed after admin confirms your payment.
+        </p>
+      </div>
+    </div>
+  </Card>
+)}
+
+
+
 
       <ScrollingTicker />
 
