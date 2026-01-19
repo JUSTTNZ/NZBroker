@@ -91,16 +91,16 @@ export default function BotTradingPage() {
   const [botBalance, setBotBalance] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  function calculateProfitPercentageForAmount(amount: number): number {
-    if (amount >= 10000) return 25
-    if (amount >= 5000) return 20
-    if (amount >= 2500) return 15
-    if (amount >= 1000) return 10
-    if (amount >= 500) return 8
-    if (amount >= 250) return 6
-    if (amount >= 100) return 5
-    return 3
-  }
+function calculateProfitPercentageForAmount(amount: number): number {
+    if (amount >= 10000) return 40      // was 25
+    if (amount >= 5000) return 35       // was 20
+    if (amount >= 2500) return 30       // was 15
+    if (amount >= 1000) return 25       // was 10
+    if (amount >= 500) return 22        // was 8
+    if (amount >= 250) return 20        // was 6
+    if (amount >= 100) return 15        // was 80 (or 8 if typo)
+    return 10                           // was 3
+}
   
    function calculateExpectedProfitForUI(
     investment: number,
@@ -108,9 +108,9 @@ export default function BotTradingPage() {
   ): number {
     const basePercentage = calculateProfitPercentageForAmount(investment)
     const modeMultiplier = {
-      'conservative': 100,
-      'balanced': 300,
-      'aggressive': 500
+      'conservative': 50,
+      'balanced': 80,
+      'aggressive': 90
     }[tradingMode] || 1
     
     const baseProfit = (investment * basePercentage) / 100
@@ -577,8 +577,8 @@ const handleStartBotTrade = async () => {
                       <span>Mode Boost ({config.tradingMode}):</span>
                       <span className="font-medium">
                         {
-                          config.tradingMode === 'conservative' ? '10x' :
-                          config.tradingMode === 'balanced' ? '30x' : '50x'
+                          config.tradingMode === 'conservative' ? '50x' :
+                          config.tradingMode === 'balanced' ? '80x' : '90x'
                         }
                       </span>
                     </div>

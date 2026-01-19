@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { read } from "fs"
 
 interface Withdrawal {
   id: string
@@ -122,174 +123,142 @@ export default function AdminWithdrawalsPage() {
   const stats = {
     pending_payment: withdrawals.filter(w => w.status === "pending_payment").length,
     payment_pending: withdrawals.filter(w => w.status === "payment_pending").length,
-    payment_received: withdrawals.filter(w => w.status === "payment_received").length,
     approved: withdrawals.filter(w => w.status === "approved").length,
     completed: withdrawals.filter(w => w.status === "completed").length,
     total_pending_amount: withdrawals
-      .filter(w => ["pending_payment", "payment_pending", "payment_received"].includes(w.status))
+      .filter(w => ["pending_payment", "payment_pending"].includes(w.status))
       .reduce((sum, w) => sum + w.amount, 0)
   }
 
   // Handle providing payment instructions
-  const handleProvidePaymentInstructions = async (withdrawal: Withdrawal) => {
-    if (!paymentAmount || !paymentInstructions) {
-      toast.error("Please enter payment amount and instructions")
-      return
-    }
-
-    const adminFee = parseFloat(paymentAmount)
-    if (adminFee > withdrawal.amount) {
-      toast.error("Payment amount cannot exceed withdrawal amount")
-      return
-    }
-
-    setProcessingAction("providing_payment")
-    try {
-      const { error } = await supabase
-        .from("withdrawals")
-        .update({
-          status: "payment_pending",
-          admin_fee: adminFee,
-          net_amount: withdrawal.amount - adminFee,
-          payment_details: paymentInstructions,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", withdrawal.id)
-
-      if (error) throw error
-
-      // Create notification for user
-      await supabase.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        title: "Payment Instructions Received",
-        message: `Admin has provided payment instructions for your $${withdrawal.amount} withdrawal. Please check the payment details.`,
-        type: "withdrawal_payment",
-        is_read: false,
-        created_at: new Date().toISOString()
-      })
-
-      toast.success("Payment instructions sent to user")
-      setShowPaymentModal(false)
-      setPaymentAmount("")
-      setPaymentInstructions("")
-      fetchWithdrawals()
-    } catch (error) {
-      console.error("Error updating withdrawal:", error)
-      toast.error("Failed to send payment instructions")
-    } finally {
-      setProcessingAction(null)
-    }
+// Handle providing payment instructions
+const handleProvidePaymentInstructions = async (withdrawal: Withdrawal) => {
+  if (!paymentAmount || !paymentInstructions) {
+    toast.error("Please enter admin fee amount and payment instructions")
+    return
   }
 
-  // Handle marking payment as received
-  const handleMarkPaymentReceived = async (withdrawal: Withdrawal) => {
-    setProcessingAction("marking_payment")
-    try {
-      const { error } = await supabase
-        .from("withdrawals")
-        .update({
-          status: "payment_received",
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", withdrawal.id)
-
-      if (error) throw error
-
-      // Create notification for user
-      await supabase.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        title: "Payment Received",
-        message: `Your payment for the $${withdrawal.amount} withdrawal has been received and is being verified.`,
-        type: "withdrawal_payment",
-        is_read: false,
-        created_at: new Date().toISOString()
+  const adminFeeValue = parseFloat(paymentAmount) || 0
+  
+  setProcessingAction("providing_payment")
+  try {
+    const { error } = await supabase
+      .from("withdrawals")
+      .update({
+        status: "payment_pending",
+        admin_fee: adminFeeValue, // KEEP THIS
+        net_amount: withdrawal.amount - adminFeeValue, // KEEP THIS
+        payment_details: paymentInstructions,
+        updated_at: new Date().toISOString()
       })
+      .eq("id", withdrawal.id)
 
-      toast.success("Payment marked as received")
-      fetchWithdrawals()
-    } catch (error) {
-      console.error("Error updating withdrawal:", error)
-      toast.error("Failed to update payment status")
-    } finally {
-      setProcessingAction(null)
-    }
+    if (error) throw error
+
+    // Create notification for user
+    await supabase.from("notifications").insert({
+      user_id: withdrawal.user_id,
+      title: "Payment Instructions Received",
+      message: `Admin has provided payment instructions for your $${withdrawal.amount} withdrawal. Please check the payment details.`,
+      type: "withdrawal",
+      read: false,
+      created_at: new Date().toISOString()
+    })
+
+    toast.success("Payment instructions sent to user")
+    setShowPaymentModal(false)
+    setPaymentAmount("")
+    setPaymentInstructions("")
+    fetchWithdrawals()
+  } catch (error) {
+    console.error("Error updating withdrawal:", error)
+    toast.error("Failed to send payment instructions")
+  } finally {
+    setProcessingAction(null)
   }
+}
 
   // Handle approving withdrawal
-  const handleApproveWithdrawal = async (withdrawal: Withdrawal) => {
-    setProcessingAction("approving")
-    try {
-      const { error } = await supabase
-        .from("withdrawals")
-        .update({
-          status: "approved",
-          processed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", withdrawal.id)
+// Handle approving withdrawal
+const handleApproveWithdrawal = async (withdrawal: Withdrawal) => {
+  setProcessingAction("approving")
+  try {
+    // First get the current wallet to see the locked_balance
+    const { data: currentWallet, error: walletFetchError } = await supabase
+      .from("wallets")
+      .select("locked_balance")
+      .eq("user_id", withdrawal.user_id)
+      .eq("account_type", withdrawal.account_type)
+      .single()
 
-      if (error) throw error
-
-      // Deduct from user's wallet
-      const { error: walletError } = await supabase
-        .from("wallets")
-        .update({
-          total_balance: supabase.rpc('decrement', { 
-            table_name: 'wallets', 
-            column_name: 'total_balance', 
-            x: withdrawal.amount,
-            user_id: withdrawal.user_id,
-            account_type: withdrawal.account_type 
-          }),
-          locked_balance: supabase.rpc('decrement', { 
-            table_name: 'wallets', 
-            column_name: 'locked_balance', 
-            x: withdrawal.amount,
-            user_id: withdrawal.user_id,
-            account_type: withdrawal.account_type 
-          }),
-          updated_at: new Date().toISOString()
-        })
-        .eq("user_id", withdrawal.user_id)
-        .eq("account_type", withdrawal.account_type)
-
-      if (walletError) {
-        console.error("Wallet update error:", walletError)
-        // Continue anyway
-      }
-
-      // Create transaction record
-      await supabase.from("transactions").insert({
-        user_id: withdrawal.user_id,
-        account_type: withdrawal.account_type,
-        type: "withdrawal",
-        amount: -withdrawal.amount,
-        description: `Withdrawal approved via ${withdrawal.method}`,
-        status: "completed",
-        reference_id: `WDR_APPROVED_${withdrawal.id}`,
-        created_at: new Date().toISOString()
-      })
-
-      // Create notification for user
-      await supabase.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        title: "Withdrawal Approved",
-        message: `Your withdrawal request for $${withdrawal.amount} has been approved and is being processed.`,
-        type: "withdrawal_approval",
-        is_read: false,
-        created_at: new Date().toISOString()
-      })
-
-      toast.success("Withdrawal approved successfully")
-      setShowApproveModal(false)
-      fetchWithdrawals()
-    } catch (error) {
-      console.error("Error approving withdrawal:", error)
-      toast.error("Failed to approve withdrawal")
-    } finally {
-      setProcessingAction(null)
+    if (walletFetchError) {
+      console.error("Error fetching wallet:", walletFetchError)
+      throw new Error("Failed to fetch wallet data")
     }
+
+    // Calculate new locked balance
+    const currentLockedBalance = currentWallet?.locked_balance || 0
+    const newLockedBalance = currentLockedBalance - withdrawal.amount
+
+    // Update withdrawal status
+    const { error: withdrawalError } = await supabase
+      .from("withdrawals")
+      .update({
+        status: "completed", // Directly to completed
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", withdrawal.id)
+
+    if (withdrawalError) throw withdrawalError
+
+    // Update wallet - deduct from locked balance
+    const { error: walletUpdateError } = await supabase
+      .from("wallets")
+      .update({
+        locked_balance: newLockedBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq("user_id", withdrawal.user_id)
+      .eq("account_type", withdrawal.account_type)
+
+    if (walletUpdateError) {
+      console.error("Wallet update error:", walletUpdateError)
+      // Continue anyway - we already updated withdrawal status
+    }
+
+    // Create transaction record
+    await supabase.from("transactions").insert({
+      user_id: withdrawal.user_id,
+      account_type: withdrawal.account_type,
+      type: "withdrawal",
+      amount: -withdrawal.amount,
+      description: `Withdrawal completed via ${withdrawal.method}`,
+      status: "completed",
+      reference_id: `WDR_COMPLETED_${withdrawal.id}`,
+      created_at: new Date().toISOString()
+    })
+
+    // Create notification for user
+    await supabase.from("notifications").insert({
+      user_id: withdrawal.user_id,
+      title: "Withdrawal Completed",
+      message: `Your withdrawal request for $${withdrawal.amount} has been processed and funds have been sent.`,
+      type: "withdrawal",
+      read: false,
+      created_at: new Date().toISOString()
+    })
+
+    toast.success("Withdrawal approved and completed")
+    setShowApproveModal(false)
+    fetchWithdrawals()
+  } catch (error) {
+    console.error("Error approving withdrawal:", error)
+    toast.error("Failed to approve withdrawal")
+  } finally {
+    setProcessingAction(null)
   }
+}
 
   // Handle rejecting withdrawal
   const handleRejectWithdrawal = async (withdrawal: Withdrawal) => {
@@ -355,39 +324,7 @@ export default function AdminWithdrawalsPage() {
     }
   }
 
-  // Handle completing withdrawal
-  const handleCompleteWithdrawal = async (withdrawal: Withdrawal) => {
-    setProcessingAction("completing")
-    try {
-      const { error } = await supabase
-        .from("withdrawals")
-        .update({
-          status: "completed",
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", withdrawal.id)
 
-      if (error) throw error
-
-      // Create notification for user
-      await supabase.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        title: "Withdrawal Completed",
-        message: `Your withdrawal of $${withdrawal.amount} has been processed and funds have been sent.`,
-        type: "withdrawal_completion",
-        is_read: false,
-        created_at: new Date().toISOString()
-      })
-
-      toast.success("Withdrawal marked as completed")
-      fetchWithdrawals()
-    } catch (error) {
-      console.error("Error completing withdrawal:", error)
-      toast.error("Failed to complete withdrawal")
-    } finally {
-      setProcessingAction(null)
-    }
-  }
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string, bg: string, border: string }> = {
@@ -475,7 +412,7 @@ export default function AdminWithdrawalsPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {["all", "pending_payment", "payment_pending", "payment_received", "approved", "completed", "rejected"].map((status) => (
+            {["all", "pending_payment", "payment_pending", "completed", "rejected"].map((status) => (
               <Button
                 key={status}
                 variant={statusFilter === status ? "default" : "outline"}
@@ -597,17 +534,6 @@ export default function AdminWithdrawalsPage() {
                   )}
                   
                   {withdrawal.status === "payment_pending" && (
-                    <Button
-                      onClick={() => handleMarkPaymentReceived(withdrawal)}
-                      disabled={processingAction === "marking_payment"}
-                      className="bg-blue-500 hover:bg-blue-600"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      {processingAction === "marking_payment" ? "Processing..." : "Payment Received"}
-                    </Button>
-                  )}
-                  
-                  {withdrawal.status === "payment_received" && (
                     <>
                       <Button
                         onClick={() => {
@@ -635,7 +561,7 @@ export default function AdminWithdrawalsPage() {
                   
                   {withdrawal.status === "approved" && (
                     <Button
-                      onClick={() => handleCompleteWithdrawal(withdrawal)}
+                      // onClick={() => handleCompleteWithdrawal(withdrawal)}
                       disabled={processingAction === "completing"}
                       className="bg-green-600 hover:bg-green-700"
                     >
@@ -700,72 +626,73 @@ export default function AdminWithdrawalsPage() {
       )}
 
       {/* Payment Instructions Modal */}
-      {showPaymentModal && selectedWithdrawal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold mb-4">Provide Payment Instructions</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              User: {selectedWithdrawal.user_name}<br />
-              Amount: ${selectedWithdrawal.amount}
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Payment Amount Required ($)</label>
-                <Input
-                  type="number"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  placeholder="Enter amount user needs to pay"
-                  min="0"
-                  max={selectedWithdrawal.amount}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Maximum: ${selectedWithdrawal.amount}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Payment Instructions</label>
-                <Textarea
-                  value={paymentInstructions}
-                  onChange={(e) => setPaymentInstructions(e.target.value)}
-                  placeholder="Provide payment details (bank account, crypto address, etc.)"
-                  rows={4}
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setShowPaymentModal(false)
-                  setPaymentAmount("")
-                  setPaymentInstructions("")
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600"
-                onClick={() => handleProvidePaymentInstructions(selectedWithdrawal)}
-                disabled={processingAction === "providing_payment"}
-              >
-                {processingAction === "providing_payment" ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Instructions
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
+
+{showPaymentModal && selectedWithdrawal && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <Card className="w-full max-w-md p-6">
+      <h3 className="text-lg font-semibold mb-4">Provide Payment Instructions</h3>
+      <p className="text-sm text-muted-foreground mb-4">
+        User: {selectedWithdrawal.user_name}<br />
+        Amount: ${selectedWithdrawal.amount}
+      </p>
+      <div className="space-y-4">
+        {/* KEEP THIS ADMIN FEE INPUT */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Admin Fee Amount ($)</label>
+          <Input
+            type="number"
+            value={paymentAmount}
+            onChange={(e) => setPaymentAmount(e.target.value)}
+            placeholder="Enter admin fee amount"
+            min="0"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Enter the admin fee amount (e.g., 25 for $25 fee)
+          </p>
         </div>
-      )}
+        <div>
+          <label className="block text-sm font-medium mb-2">Payment Instructions</label>
+          <Textarea
+            value={paymentInstructions}
+            onChange={(e) => setPaymentInstructions(e.target.value)}
+            placeholder="Provide payment details (bank account, crypto address, etc.)"
+            rows={4}
+          />
+        </div>
+      </div>
+      <div className="flex gap-3 mt-6">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => {
+            setShowPaymentModal(false)
+            setPaymentAmount("")
+            setPaymentInstructions("")
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          className="flex-1 bg-yellow-500 hover:bg-yellow-600"
+          onClick={() => handleProvidePaymentInstructions(selectedWithdrawal)}
+          disabled={processingAction === "providing_payment"}
+        >
+          {processingAction === "providing_payment" ? (
+            <>
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4 mr-2" />
+              Send Instructions
+            </>
+          )}
+        </Button>
+      </div>
+    </Card>
+  </div>
+)}
 
       {/* Approve Modal */}
       {showApproveModal && selectedWithdrawal && (
@@ -776,7 +703,6 @@ export default function AdminWithdrawalsPage() {
               Are you sure you want to approve this withdrawal?<br /><br />
               User: {selectedWithdrawal.user_name}<br />
               Amount: ${selectedWithdrawal.amount}<br />
-              Net Amount: ${selectedWithdrawal.net_amount}<br />
               Method: {selectedWithdrawal.method}
             </p>
             <div className="flex gap-3 mt-6">
