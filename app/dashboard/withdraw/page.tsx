@@ -98,7 +98,7 @@ export default function WithdrawPage() {
         .eq("status", "pending")
 
       if (pendingWithdrawals && pendingWithdrawals.length > 0) {
-        toast.error("You already have a pending withdrawal request. Please wait for admin approval.")
+        toast.error("You already have a pending withdrawal request. Please wait for it to be processed.")
         return
       }
     } catch (error) {
@@ -177,7 +177,7 @@ export default function WithdrawPage() {
         .insert({
           user_id: user.id,
           title: "Withdrawal Request Submitted",
-          message: `Your withdrawal request for $${withdrawAmount.toFixed(2)} has been received and is pending admin approval.`,
+          message: `Your withdrawal request for $${withdrawAmount.toFixed(2)} has been received and is being processed.`,
           type: "withdrawal",
           read: false,
           created_at: new Date().toISOString()
@@ -198,7 +198,7 @@ export default function WithdrawPage() {
       setBankName("")
       setCryptoAddress("")
       
-      toast.success("Withdrawal request submitted! It is now pending admin approval.")
+      toast.success("Withdrawal request submitted! It is now being processed.")
 
     } catch (error: any) {
       console.error('Withdrawal error:', error)
@@ -259,7 +259,7 @@ export default function WithdrawPage() {
           <div>
             <p className="font-medium text-blue-600 mb-1">Withdrawal Process</p>
             <p className="text-sm text-blue-700">
-              1. Select method and enter details → 2. Submit request → 3. Admin approves → 4. Funds sent to you
+              1. Select method and enter details → 2. Submit request → 3. Verification & approval → 4. Funds sent to you
             </p>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function WithdrawPage() {
           </Button>
           
           <p className="text-sm text-muted-foreground text-center mt-3">
-            Your withdrawal will be processed after admin approval
+            Your withdrawal will be processed after verification
           </p>
         </Card>
       )}
@@ -482,7 +482,7 @@ export default function WithdrawPage() {
           </Button>
           
           <p className="text-sm text-muted-foreground text-center mt-3">
-            Your withdrawal will be processed after admin approval
+            Your withdrawal will be processed after verification
           </p>
         </Card>
       )}
@@ -495,7 +495,7 @@ export default function WithdrawPage() {
             <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
               <span className="text-xs text-blue-500">1</span>
             </div>
-            <p>Withdrawals require admin approval and are processed within 1-3 business days</p>
+            <p>Withdrawals require verification and are processed within 1-3 business days</p>
           </div>
           <div className="flex items-start gap-2">
             <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">

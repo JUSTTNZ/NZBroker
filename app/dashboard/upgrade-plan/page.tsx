@@ -142,7 +142,7 @@ export default function UpgradePlanPage() {
 
       // IMPORTANT: DO NOT update the profile yet!
       // The profile.current_plan should remain as the current active plan
-      // until admin approves the upgrade request
+      // until the upgrade request is approved
 
       // Create notification for user
       const { error: notificationError } = await supabase
@@ -150,7 +150,7 @@ export default function UpgradePlanPage() {
         .insert({
           user_id: user.id,
           title: "Upgrade Request Submitted",
-          message: `Your request to upgrade to ${planName} plan has been received. Our admin team will review it shortly.`,
+          message: `Your request to upgrade to ${planName} plan has been received. Our team will review it shortly.`,
           type: "plan_upgrade",
           is_read: false,
           created_at: new Date().toISOString()
@@ -168,7 +168,7 @@ export default function UpgradePlanPage() {
       
       setMessage({ 
         type: 'success', 
-        text: `Your request for ${planName} plan has been submitted. You'll remain on your current "${currentPlan}" plan until admin approves your request.` 
+        text: `Your request for ${planName} plan has been submitted. You'll remain on your current "${currentPlan}" plan until your request is approved.` 
       })
       
     } catch (error: any) {
@@ -229,7 +229,7 @@ export default function UpgradePlanPage() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground mt-3">
-              You will remain on this plan until your upgrade request is approved by admin.
+              You will remain on this plan until your upgrade request is approved.
             </p>
           </div>
           
@@ -367,7 +367,7 @@ export default function UpgradePlanPage() {
                 )}
                 {isUpgradeAvailable && (
                   <div className="text-xs text-muted-foreground mt-2">
-                    Admin approval required
+                    Approval required
                   </div>
                 )}
               </div>
@@ -413,9 +413,9 @@ export default function UpgradePlanPage() {
                 <span className="text-blue-600 font-bold text-xl">3</span>
               </div>
             </div>
-            <h4 className="font-semibold mb-2">Admin Review</h4>
+            <h4 className="font-semibold mb-2">Review Process</h4>
             <p className="text-sm text-muted-foreground">
-              Our admin team reviews your request (usually within 24 hours).
+              Our team reviews your request (usually within 24 hours).
             </p>
           </div>
           
@@ -440,7 +440,7 @@ export default function UpgradePlanPage() {
           <div>
             <h4 className="font-semibold mb-1">Do I get the new plan features immediately?</h4>
             <p className="text-sm text-muted-foreground">
-              No. You will continue using your current plan features until the admin approves your upgrade request.
+              No. You will continue using your current plan features until your upgrade request is approved.
             </p>
           </div>
           <div>

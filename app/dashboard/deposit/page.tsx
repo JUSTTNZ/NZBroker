@@ -232,7 +232,7 @@ export default function DepositPage() {
                   <Wallet className="w-5 h-5 text-green-500" />
                   <div>
                     <h3 className="font-semibold">Pay to this {wallet.currency} Wallet</h3>
-                    <p className="text-sm text-gray-500">For admin to fund your live account</p>
+                    <p className="text-sm text-gray-500">To fund your live account</p>
                   </div>
                 </div>
 
