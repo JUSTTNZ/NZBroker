@@ -775,7 +775,7 @@ const handleStartBotTrade = async () => {
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
-                      <span><strong>Admin Speed Up:</strong> Admin can increase progress faster if needed</span>
+                      <span><strong>Accelerated Processing:</strong> Progress may be accelerated based on market conditions</span>
                     </li>
                   </ul>
                 </div>

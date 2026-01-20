@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 // Update interface to match NEW schema
 interface UserProfile {
@@ -276,10 +277,10 @@ const signIn = useCallback(async (email: string, password: string) => {
 }, [supabase])
 
 const signOut = useCallback(async () => {
-  // Sign out from Supabase first (don't await - fire and forget)
-  supabase.auth.signOut()
+  // Show toast immediately for instant feedback
+  toast.success("Signed out successfully!")
 
-  // Clear state immediately
+  // Clear state immediately for fast UI response
   setUser(null)
   setUserProfile(null)
   setWallets(null)
@@ -288,8 +289,11 @@ const signOut = useCallback(async () => {
   setCurrentWallet(null)
   setActivePlan(null)
 
-  // Redirect to home
-  window.location.href = "/"
+  // Sign out from Supabase (fire and forget - don't wait)
+  supabase.auth.signOut()
+
+  // Redirect to login page
+  window.location.href = "/login"
 }, [supabase])
 
 const refreshUser = useCallback(async () => {

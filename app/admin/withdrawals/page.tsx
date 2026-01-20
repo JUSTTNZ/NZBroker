@@ -159,7 +159,7 @@ const handleProvidePaymentInstructions = async (withdrawal: Withdrawal) => {
     await supabase.from("notifications").insert({
       user_id: withdrawal.user_id,
       title: "Payment Instructions Received",
-      message: `Admin has provided payment instructions for your $${withdrawal.amount} withdrawal. Please check the payment details.`,
+      message: `Payment instructions for your $${withdrawal.amount} withdrawal are now available. Please check the payment details to proceed.`,
       type: "withdrawal",
       read: false,
       created_at: new Date().toISOString()

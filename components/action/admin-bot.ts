@@ -129,7 +129,7 @@ export async function adminStopBotTrade(botTradeId: string) {
       account_type: accountType,
       type: 'bot_completion',
       amount: finalProfit,
-      description: `Bot trade stopped by admin for ${botTrade.symbol}. Progress: ${currentProgress.toFixed(1)}%, Profit: $${finalProfit.toFixed(2)}`,
+      description: `Bot trade completed for ${botTrade.symbol}. Progress: ${currentProgress.toFixed(1)}%, Profit: $${finalProfit.toFixed(2)}`,
       status: 'completed',
       metadata: {
         bot_trade_id: botTradeId,
@@ -141,14 +141,14 @@ export async function adminStopBotTrade(botTradeId: string) {
         total_payout: totalPayout,
         admin_stopped: true
       },
-      reference_id: `BOT_ADMIN_STOP_${botTradeId}`
+      reference_id: `BOT_COMPLETE_${botTradeId}`
     })
     
     // Create notification for user
     await supabase.from('notifications').insert({
       user_id: botTrade.user_id,
-      title: 'Bot Trade Stopped by Admin',
-      message: `${botTrade.strategy} bot for ${botTrade.symbol} was stopped by admin. Progress: ${currentProgress.toFixed(1)}%. Profit: $${finalProfit.toFixed(2)}. Total payout: $${totalPayout.toFixed(2)}`,
+      title: 'Bot Trade Completed',
+      message: `Your ${botTrade.strategy} bot for ${botTrade.symbol} has been completed. Progress: ${currentProgress.toFixed(1)}%. Profit: $${finalProfit.toFixed(2)}. Total payout: $${totalPayout.toFixed(2)}`,
       type: 'bot_trade_completed',
       metadata: {
         symbol: botTrade.symbol,
@@ -211,8 +211,8 @@ export async function adminPauseBotTrade(botTradeId: string) {
     // Create notification for user
     await supabase.from('notifications').insert({
       user_id: botTrade.user_id,
-      title: 'Bot Trade Paused by Admin',
-      message: `${botTrade.strategy} bot for ${botTrade.symbol} has been paused by admin.`,
+      title: 'Bot Trade Paused',
+      message: `Your ${botTrade.strategy} bot for ${botTrade.symbol} has been temporarily paused. It will resume operations shortly.`,
       type: 'bot_trade_paused',
       metadata: {
         symbol: botTrade.symbol,
@@ -266,8 +266,8 @@ export async function adminResumeBotTrade(botTradeId: string) {
     // Create notification for user
     await supabase.from('notifications').insert({
       user_id: botTrade.user_id,
-      title: 'Bot Trade Resumed by Admin',
-      message: `${botTrade.strategy} bot for ${botTrade.symbol} has been resumed by admin.`,
+      title: 'Bot Trade Resumed',
+      message: `Your ${botTrade.strategy} bot for ${botTrade.symbol} has resumed trading operations. Thank you for your patience.`,
       type: 'bot_trade_resumed',
       metadata: {
         symbol: botTrade.symbol,
@@ -398,8 +398,8 @@ export async function adminUpdateBotProgress(botTradeId: string, progress: numbe
     // Create notification for user
     await supabase.from('notifications').insert({
       user_id: botTrade.user_id,
-      title: 'Bot Progress Updated by Admin',
-      message: `Your trading bot progress has been updated to ${validatedProgress.toFixed(1)}%. Current profit: $${currentProfit.toFixed(2)}`,
+      title: 'Bot Progress Update',
+      message: `Great news! Your trading bot progress has reached ${validatedProgress.toFixed(1)}%. Current profit: $${currentProfit.toFixed(2)}`,
       type: 'bot_progress_updated',
       metadata: {
         bot_trade_id: botTradeId,

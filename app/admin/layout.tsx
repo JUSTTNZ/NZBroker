@@ -19,6 +19,8 @@ import {
   FileCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -153,8 +155,18 @@ export default function AdminLayout({
             variant="ghost"
             className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={() => {
+              // Show toast immediately for instant feedback
+              toast.success("Signed out successfully!")
+
+              // Clear any stored auth data
               localStorage.removeItem("authToken")
-              window.location.href = "/"
+
+              // Sign out from Supabase (fire and forget)
+              const supabase = createClient()
+              supabase.auth.signOut()
+
+              // Redirect to login page
+              window.location.href = "/login"
             }}
           >
             <LogOut className="w-4 h-4 mr-2 flex-shrink-0" />

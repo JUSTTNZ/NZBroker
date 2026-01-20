@@ -154,7 +154,7 @@ useEffect(() => {
         
         
         <p className="text-xs text-red-500/80 mt-3">
-          ⚠️ Your withdrawal will be processed after admin confirms your payment.
+          ⚠️ Your withdrawal will be processed after we confirm your payment.
         </p>
       </div>
     </div>
