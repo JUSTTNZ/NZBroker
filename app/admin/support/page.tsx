@@ -53,6 +53,9 @@ export default function SupportPage() {
   const [sendingMessage, setSendingMessage] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const channelRef = useRef<any>(null)
+  const [isTyping, setIsTyping] = useState<{ sender_type: "user" | "admin"; typing: boolean } | null>(null)
 
   const supabase = createClient()
 
@@ -95,9 +98,10 @@ export default function SupportPage() {
     if (!selectedTicket) return
     fetchMessages(selectedTicket.id)
 
-    // Set up real-time subscription for messages
+    // Set up real-time subscription for messages and typing
+    // Use the same channel name as the user side so they can communicate
     const channel = supabase
-      .channel(`admin-ticket-${selectedTicket.id}`)
+      .channel(`ticket-${selectedTicket.id}`)
       .on(
         'postgres_changes',
         {
@@ -112,9 +116,19 @@ export default function SupportPage() {
             if (prev.some(m => m.id === newMsg.id)) return prev
             return [...prev, newMsg]
           })
+          // Stop typing indicator when message is received
+          setIsTyping(null)
         }
       )
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const { sender_type, typing } = payload.payload
+        if (sender_type !== 'admin') { // Only show typing for user (other side)
+          setIsTyping(typing ? { sender_type, typing } : null)
+        }
+      })
       .subscribe()
+
+    channelRef.current = channel
 
     return () => {
       supabase.removeChannel(channel)
@@ -160,6 +174,33 @@ export default function SupportPage() {
       console.error("Error fetching messages:", error)
       setMessages([])
     }
+  }
+
+  const handleTyping = (value: string) => {
+    setNewMessage(value)
+
+    if (!selectedTicket || !channelRef.current) return
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Broadcast typing start using the channel reference
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { sender_type: 'admin', typing: true }
+    })
+
+    // Set timeout to stop typing
+    typingTimeoutRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { sender_type: 'admin', typing: false }
+      })
+    }, 2000)
   }
 
   const handleSendMessage = async () => {
@@ -541,6 +582,23 @@ export default function SupportPage() {
                     </div>
                   ))
                 )}
+
+                {/* Typing Indicator */}
+                {isTyping && isTyping.typing && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted text-foreground rounded-2xl rounded-bl-none px-4 py-3 max-w-[80%]">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-sm">Customer is typing</span>
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
 
@@ -549,7 +607,7 @@ export default function SupportPage() {
                 <div className="flex gap-2">
                   <Input
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => handleTyping(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
                     placeholder="Type your reply..."
                     disabled={sendingMessage}

@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import {
   MessageSquare,
   Mail,
-  Phone,
   Send,
   Plus,
   Clock,
@@ -55,55 +54,11 @@ export default function SupportPage() {
   const [newTicketPriority, setNewTicketPriority] = useState<"low" | "medium" | "high">("medium")
   const [creatingTicket, setCreatingTicket] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const channelRef = useRef<any>(null)
+  const [isTyping, setIsTyping] = useState<{ sender_type: "user" | "admin"; typing: boolean } | null>(null)
 
   const supabase = createClient()
-
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  // Fetch user's tickets
-  useEffect(() => {
-    if (!user) return
-    fetchTickets()
-  }, [user])
-
-  // Fetch messages when ticket is selected
-  useEffect(() => {
-    if (!selectedTicket) return
-    fetchMessages(selectedTicket.id)
-
-    // Set up real-time subscription for messages
-    const channel = supabase
-      .channel(`ticket-${selectedTicket.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'support_messages',
-          filter: `ticket_id=eq.${selectedTicket.id}`
-        },
-        (payload) => {
-          const newMsg = payload.new as SupportMessage
-          setMessages(prev => {
-            // Avoid duplicates
-            if (prev.some(m => m.id === newMsg.id)) return prev
-            return [...prev, newMsg]
-          })
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [selectedTicket])
 
   const fetchTickets = async () => {
     if (!user) return
@@ -142,6 +97,63 @@ export default function SupportPage() {
       setMessages([])
     }
   }
+
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  // Fetch user's tickets
+  useEffect(() => {
+    if (!user) return
+    fetchTickets()
+  }, [user])
+
+  // Fetch messages when ticket is selected
+  useEffect(() => {
+    if (!selectedTicket) return
+    fetchMessages(selectedTicket.id)
+
+    // Set up real-time subscription for messages and typing
+    const channel = supabase
+      .channel(`ticket-${selectedTicket.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'support_messages',
+          filter: `ticket_id=eq.${selectedTicket.id}`
+        },
+        (payload) => {
+          const newMsg = payload.new as SupportMessage
+          setMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => m.id === newMsg.id)) return prev
+            return [...prev, newMsg]
+          })
+          // Stop typing indicator when message is received
+          setIsTyping(null)
+        }
+      )
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const { sender_type, typing } = payload.payload
+        if (sender_type !== 'user') { // Only show typing for admin (other side)
+          setIsTyping(typing ? { sender_type, typing } : null)
+        }
+      })
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedTicket])
 
   const handleCreateTicket = async () => {
     if (!user || !newTicketSubject.trim() || !newTicketMessage.trim()) {
@@ -279,6 +291,33 @@ export default function SupportPage() {
     }
   }
 
+  const handleTyping = (value: string) => {
+    setNewMessage(value)
+
+    if (!selectedTicket) return
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Send typing indicator
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { sender_type: 'user', typing: true }
+    })
+
+    // Set timeout to stop typing
+    typingTimeoutRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { sender_type: 'user', typing: false }
+      })
+    }, 1000)
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -319,7 +358,7 @@ export default function SupportPage() {
       </div>
 
       {/* Contact Options */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-4 bg-card/50 border-border/40">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -344,17 +383,6 @@ export default function SupportPage() {
           </div>
         </Card>
 
-        <Card className="p-4 bg-card/50 border-border/40">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <Phone className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <h3 className="font-semibold">Phone Support</h3>
-              <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
-            </div>
-          </div>
-        </Card>
       </div>
 
       {/* New Ticket Form */}
@@ -537,6 +565,23 @@ export default function SupportPage() {
                     </div>
                   ))
                 )}
+
+                {/* Typing Indicator */}
+                {isTyping && isTyping.typing && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted text-foreground rounded-2xl rounded-bl-none px-4 py-3 max-w-[80%]">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-sm">Support is typing</span>
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
 
@@ -545,7 +590,7 @@ export default function SupportPage() {
                 <div className="flex gap-2">
                   <Input
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => handleTyping(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
                     placeholder="Type your message..."
                     disabled={sendingMessage}

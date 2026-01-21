@@ -6,10 +6,10 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { 
-  Bot, Play, StopCircle, TrendingUp, 
-  DollarSign, Zap, Shield, 
-  RefreshCw, Rocket, Brain, 
+import {
+  Bot, Play, StopCircle, TrendingUp, TrendingDown,
+  DollarSign, Zap, Shield,
+  RefreshCw, Rocket, Brain,
   Crown, Target, Bitcoin,
   Settings, LineChart, Apple,
   BarChart3, Clock, Coins,
@@ -17,16 +17,18 @@ import {
   Sparkles,
   Lock,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  ArrowUp,
+  ArrowDown,
+  Activity,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
 import { toast } from "sonner"
-import { 
-  createBotTrade, 
-  stopBotTrade, 
-  getActiveBotTrades, 
-  getBotTradingBalance,
-
-
+import {
+  createBotTrade,
+  stopBotTrade,
+  getActiveBotTrades
 } from "@/components/action/bot-trading"
 import { useRouter } from "next/navigation"
 
@@ -88,33 +90,46 @@ export default function BotTradingPage() {
   const [selectedBot, setSelectedBot] = useState('trend')
   const [selectedAsset, setSelectedAsset] = useState("BTC")
   const [botTrades, setBotTrades] = useState<any[]>([])
-  const [botBalance, setBotBalance] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  function calculateProfitPercentageForAmount(amount: number): number {
-    if (amount >= 10000) return 25
-    if (amount >= 5000) return 20
-    if (amount >= 2500) return 15
-    if (amount >= 1000) return 10
-    if (amount >= 500) return 8
-    if (amount >= 250) return 6
-    if (amount >= 100) return 5
-    return 3
-  }
-  
-   function calculateExpectedProfitForUI(
+  const [expandedBots, setExpandedBots] = useState<Set<string>>(new Set())
+
+  // Use bot balance from currentWallet context instead of separate state
+  const botBalance = currentWallet?.bot_trading_balance || 0
+  // High-yield profit calculation matching backend
+  function calculateExpectedProfitForUI(
     investment: number,
     tradingMode: 'conservative' | 'balanced' | 'aggressive'
   ): number {
-    const basePercentage = calculateProfitPercentageForAmount(investment)
-    const modeMultiplier = {
-      'conservative': 100,
-      'balanced': 300,
-      'aggressive': 500
-    }[tradingMode] || 1
-    
-    const baseProfit = (investment * basePercentage) / 100
-    return baseProfit * modeMultiplier
+    // Profit multipliers based on trading mode
+    const profitMultiplier = {
+      'conservative': { min: 5, max: 10 },    // 5x-10x investment
+      'balanced': { min: 15, max: 25 },       // 15x-25x investment
+      'aggressive': { min: 30, max: 50 }      // 30x-50x investment
+    }[tradingMode] || { min: 5, max: 10 }
+
+    // Use average multiplier
+    const avgMultiplier = (profitMultiplier.min + profitMultiplier.max) / 2
+
+    // Higher investments get bonus rates
+    let investmentBonus = 1
+    if (investment >= 10000) investmentBonus = 1.25
+    else if (investment >= 5000) investmentBonus = 1.2
+    else if (investment >= 2500) investmentBonus = 1.15
+    else if (investment >= 1000) investmentBonus = 1.1
+    else if (investment >= 500) investmentBonus = 1.05
+
+    return investment * avgMultiplier * investmentBonus
+  }
+
+  // Get multiplier range for display
+  function getMultiplierRange(tradingMode: 'conservative' | 'balanced' | 'aggressive'): string {
+    const ranges = {
+      'conservative': '5x-10x',
+      'balanced': '15x-25x',
+      'aggressive': '30x-50x'
+    }
+    return ranges[tradingMode] || '5x-10x'
   }
   const [config, setConfig] = useState({
     investmentAmount: 100,
@@ -125,32 +140,36 @@ export default function BotTradingPage() {
   const currentPlan = userProfile?.current_plan || "basic"
   const canUseBotTrading = currentPlan !== "basic"
   
-  // Calculate using imported functions
-  const profitPercentage = (config.investmentAmount)
+  // Calculate expected profit and total payout
   const expectedProfit = calculateExpectedProfitForUI(config.investmentAmount, config.tradingMode)
   const totalPayout = config.investmentAmount + expectedProfit
+  const multiplierRange = getMultiplierRange(config.tradingMode)
 
   useEffect(() => {
-    if (canUseBotTrading) {
+    if (canUseBotTrading && currentWallet && userProfile) {
       loadBotData()
-      const interval = setInterval(loadBotData, 10000)
+      // Update every 5 seconds for realistic price movements
+      const interval = setInterval(loadBotData, 5000)
       return () => clearInterval(interval)
     }
-  }, [canUseBotTrading])
+  // Re-fetch when account type changes (demo/live switch)
+  }, [canUseBotTrading, currentWallet, userProfile?.account_type])
 
   const loadBotData = async () => {
-    if (refreshing || !canUseBotTrading) return
-    
+    if (refreshing || !canUseBotTrading || !currentWallet || !userProfile) return
+
     try {
       setRefreshing(true)
-      const [trades, balance] = await Promise.all([
-        getActiveBotTrades(),
-        getBotTradingBalance()
-      ])
+      // Refresh wallet data from context first
+      await refreshAllData?.()
+      // Fetch bot trades for current account type (demo or live)
+      const trades = await getActiveBotTrades(userProfile.account_type)
       setBotTrades(trades || [])
-      setBotBalance(balance || 0)
     } catch (error: any) {
       console.error('Failed to load bot data:', error)
+      if (error.message !== 'Authentication required') {
+        toast.error('Failed to load bot data')
+      }
     } finally {
       setRefreshing(false)
     }
@@ -161,6 +180,12 @@ const handleStartBotTrade = async () => {
   console.log('[handleStartBotTrade] User plan:', currentPlan);
   console.log('[handleStartBotTrade] Can use bot trading?', canUseBotTrading);
   console.log('[handleStartBotTrade] Bot balance:', botBalance, 'Investment:', config.investmentAmount);
+
+  // Check if user and wallet exist
+  if (!currentWallet || !userProfile) {
+    toast.error("Please wait for your account to load or try refreshing the page");
+    return;
+  }
 
   if (!canUseBotTrading) {
     console.warn('[handleStartBotTrade] User needs upgrade');
@@ -209,8 +234,7 @@ const handleStartBotTrade = async () => {
         maxPositionSize: config.investmentAmount,
         tradingMode: config.tradingMode,
         autoReinvest: config.autoReinvest,
-        botType: selectedBotType.id,
-        takeProfit: profitPercentage
+        botType: selectedBotType.id
       }
     );
     
@@ -223,7 +247,11 @@ const handleStartBotTrade = async () => {
     
   } catch (error: any) {
     console.error('[handleStartBotTrade] Error creating bot trade:', error);
-    toast.error(error.message || "Failed to start bot");
+    if (error.message === 'Authentication required') {
+      toast.error("Session expired. Please refresh the page and try again.");
+    } else {
+      toast.error(error.message || "Failed to start bot");
+    }
   } finally {
     setLoading(false);
     console.log('[handleStartBotTrade] Process completed');
@@ -263,8 +291,15 @@ const handleStartBotTrade = async () => {
           <h1 className="text-3xl font-bold">AI Trading Bots</h1>
           <p className="text-muted-foreground mt-1">7-day automated trading with smart algorithms</p>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
+          <Badge className={`capitalize px-3 py-1 ${
+            userProfile?.account_type === 'live'
+              ? 'bg-green-500/20 text-green-600 border-green-500/30'
+              : 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30'
+          }`}>
+            {userProfile?.account_type || 'demo'} Account
+          </Badge>
           <Badge className={`capitalize px-3 py-1 ${
             currentPlan === 'elite' ? 'bg-purple-500/20 text-purple-600 border-purple-500/30' :
             currentPlan === 'pro' ? 'bg-blue-500/20 text-blue-600 border-blue-500/30' :
@@ -447,16 +482,22 @@ const handleStartBotTrade = async () => {
                     <span>${Math.min(50000, botBalance).toLocaleString()}</span>
                   </div>
                   
-                  {/* Profit percentage based on investment */}
-                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg">
+                  {/* Profit multiplier based on mode */}
+                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Profit Percentage:</span>
+                      <span className="text-sm font-medium">Profit Multiplier:</span>
                       <span className="text-lg font-bold text-green-500">
-                        {profitPercentage}%
+                        {multiplierRange}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Higher investment = Higher percentage return
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-sm text-muted-foreground">Expected Profit:</span>
+                      <span className="text-lg font-bold text-green-600">
+                        ${expectedProfit.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      $200 at 40x = $8,000 profit • Higher modes = Higher returns
                     </p>
                   </div>
                 </div>
@@ -466,9 +507,9 @@ const handleStartBotTrade = async () => {
                   <label className="font-medium block mb-3">Trading Intensity</label>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { mode: 'conservative', label: 'Conservative', desc: 'Lower risk', multiplier: '10x' },
-                      { mode: 'balanced', label: 'Balanced', desc: 'Medium risk', multiplier: '30x' },
-                      { mode: 'aggressive', label: 'Aggressive', desc: 'Higher reward', multiplier: '50x' },
+                      { mode: 'conservative', label: 'Conservative', desc: 'Steady gains', multiplier: '5x-10x' },
+                      { mode: 'balanced', label: 'Balanced', desc: 'Good returns', multiplier: '15x-25x' },
+                      { mode: 'aggressive', label: 'Aggressive', desc: 'Maximum profit', multiplier: '30x-50x' },
                     ].map(({ mode, label, desc, multiplier }) => (
                       <button
                         key={mode}
@@ -481,7 +522,7 @@ const handleStartBotTrade = async () => {
                       >
                         <div className="font-medium">{label}</div>
                         <div className="text-xs text-muted-foreground mt-1">{desc}</div>
-                        <div className="text-xs font-medium text-green-500 mt-1">{multiplier} profit boost</div>
+                        <div className="text-xs font-medium text-green-500 mt-1">{multiplier} returns</div>
                       </button>
                     ))}
                   </div>
@@ -532,28 +573,28 @@ const handleStartBotTrade = async () => {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Investment:</span>
-                      <span className="font-bold">${config.investmentAmount}</span>
+                      <span className="font-bold">${config.investmentAmount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Profit Percentage:</span>
+                      <span className="text-muted-foreground">Profit Multiplier:</span>
                       <span className="font-bold text-green-500">
-                        {profitPercentage}%
+                        {multiplierRange}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Trading Duration:</span>
-                      <span className="font-bold text-blue-500">7 days (Fixed)</span>
+                      <span className="font-bold text-blue-500">7 days</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Expected Profit:</span>
                       <span className="font-bold text-green-500">
-                        ${expectedProfit.toFixed(2)}
+                        ${expectedProfit.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm font-bold pt-2 border-t">
-                      <span>Total at Completion (7 days):</span>
-                      <span className="text-green-500">
-                        ${totalPayout.toFixed(2)}
+                      <span>Total at Completion:</span>
+                      <span className="text-green-500 text-lg">
+                        ${totalPayout.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -561,37 +602,35 @@ const handleStartBotTrade = async () => {
 
                 {/* Profit Calculator */}
                 <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-                  <h4 className="font-medium mb-3 text-green-600 dark:text-green-400">Profit Calculator</h4>
+                  <h4 className="font-medium mb-3 text-green-600 dark:text-green-400 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Profit Calculator
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Investment:</span>
-                      <span className="font-medium">${config.investmentAmount}</span>
+                      <span>Your Investment:</span>
+                      <span className="font-medium">${config.investmentAmount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>Profit Percentage:</span>
+                      <span>Trading Mode:</span>
+                      <span className="font-medium capitalize">{config.tradingMode}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Multiplier Range:</span>
                       <span className="font-medium text-green-600">
-                        {profitPercentage}%
+                        {multiplierRange}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Mode Boost ({config.tradingMode}):</span>
-                      <span className="font-medium">
-                        {
-                          config.tradingMode === 'conservative' ? '10x' :
-                          config.tradingMode === 'balanced' ? '30x' : '50x'
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold border-t pt-2">
-                      <span>Expected Profit (7 days):</span>
+                    <div className="flex justify-between text-sm font-bold border-t pt-2 mt-2">
+                      <span>Expected Profit:</span>
                       <span className="text-green-600 dark:text-green-400">
-                        ${expectedProfit.toFixed(2)}
+                        +${expectedProfit.toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm font-bold">
-                      <span>Total Payout:</span>
-                      <span className="text-green-600 dark:text-green-400 text-lg">
-                        ${totalPayout.toFixed(2)}
+                    <div className="flex justify-between font-bold bg-green-100 dark:bg-green-900/30 -mx-4 px-4 py-3 rounded-b-lg mt-2">
+                      <span className="text-green-700 dark:text-green-300">Total Payout:</span>
+                      <span className="text-green-700 dark:text-green-300 text-xl">
+                        ${totalPayout.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -651,98 +690,225 @@ const handleStartBotTrade = async () => {
       <p className="text-sm text-muted-foreground mt-1">Launch your first bot to start earning</p>
     </div>
   ) : (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {botTrades.map((trade) => {
-        const profit = Math.max(0, trade.profit_loss || 0)
+        const profit = trade.profit_loss || 0
         const allocatedBalance = trade.metadata?.allocated_balance || 0
-        const expectedProfit = trade.metadata?.expectedProfit || 0
+        const expectedProfit = trade.config?.expectedProfit || trade.metadata?.expectedProfit || 0
         const progress = trade.metadata?.progress || 0
-        
-        // FIXED: Calculate days correctly
+        const trend = trade.metadata?.trend || 'up'
+        const percentChange = trade.metadata?.percent_change || 0
+        const isExpanded = expandedBots.has(trade.id)
+
+        // Calculate days correctly
         const startDate = trade.metadata?.startDate ? new Date(trade.metadata.startDate) : new Date(trade.created_at)
-        const endDate = trade.metadata?.endDate ? new Date(trade.metadata.endDate) : new Date(startDate)
-        endDate.setDate(startDate.getDate() + 7) // Add 7 days to start date
-        
+        const durationDays = trade.metadata?.durationDays || 7
+        const endDate = trade.metadata?.endDate ? new Date(trade.metadata.endDate) : new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000)
+
         const now = new Date()
-        
-        // Calculate total days in the bot duration (always 7 days)
-        const totalDays = 7
-        
-        // Calculate days passed (cannot be negative or exceed total days)
         const timePassed = Math.max(0, now.getTime() - startDate.getTime())
-        const daysPassed = Math.min(totalDays, timePassed / (1000 * 60 * 60 * 24))
-        
-        // Calculate days remaining (cannot be negative)
+        const daysPassed = Math.min(durationDays, timePassed / (1000 * 60 * 60 * 24))
         const timeRemaining = Math.max(0, endDate.getTime() - now.getTime())
         const daysRemaining = timeRemaining / (1000 * 60 * 60 * 24)
-        
-        // Current day number (1-7)
-        const currentDay = Math.min(7, Math.max(1, Math.ceil(daysPassed)))
-        
-        // Format days remaining nicely
+        const currentDay = Math.min(durationDays, Math.max(1, Math.ceil(daysPassed)))
+
         const formatDaysRemaining = () => {
-          if (daysRemaining <= 0) return 'Completed'
-          if (daysRemaining < 1) {
-            const hours = Math.ceil(daysRemaining * 24)
-            return `${hours} hour${hours !== 1 ? 's' : ''}`
-          }
-          if (daysRemaining < 2) return '1 day'
-          return `${Math.floor(daysRemaining)} days`
+          if (daysRemaining <= 0) return 'Completing...'
+          if (daysRemaining < 1) return `${Math.ceil(daysRemaining * 24)}h left`
+          if (daysRemaining < 2) return '1d left'
+          return `${Math.floor(daysRemaining)}d left`
         }
-        
+
+        const isUp = trend === 'up'
+        const trendColor = isUp ? 'text-green-500' : 'text-red-500'
+        const trendBg = isUp ? 'bg-green-500/10' : 'bg-red-500/10'
+        const TrendIcon = isUp ? ArrowUp : ArrowDown
+
+        const toggleExpand = () => {
+          setExpandedBots(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(trade.id)) {
+              newSet.delete(trade.id)
+            } else {
+              newSet.add(trade.id)
+            }
+            return newSet
+          })
+        }
+
         return (
           <div
             key={trade.id}
-            className="p-4 rounded-lg border border-border"
+            className={`rounded-lg border transition-all ${
+              isUp ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'
+            }`}
           >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-semibold">{trade.symbol}</h4>
-                  <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                    Active
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {trade.metadata?.botType || 'trend'} Bot
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Invested: ${allocatedBalance.toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Day {currentDay} of 7
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-green-500">+${profit.toFixed(2)}</p>
-                <p className="text-sm text-green-500">
-                  +{((profit / allocatedBalance) * 100 || 0).toFixed(2)}%
-                </p>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>Progress: {progress.toFixed(1)}%</span>
-                <span>Expected: ${expectedProfit.toFixed(2)}</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>{formatDaysRemaining()} remaining</span>
-                <span>${(allocatedBalance + expectedProfit).toFixed(2)} at completion</span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleStopBotTrade(trade.id)}
-              className="w-full"
+            {/* Collapsed Header - Always Visible */}
+            <div
+              className="p-3 cursor-pointer hover:bg-muted/20 transition-colors"
+              onClick={toggleExpand}
             >
-              <StopCircle className="w-4 h-4 mr-2" />
-              Stop Bot & Take Profit
-            </Button>
+              <div className="flex items-center justify-between">
+                {/* Left: Symbol, Status, Day */}
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${trendBg}`}>
+                    {isUp ? (
+                      <TrendingUp className={`w-4 h-4 ${trendColor}`} />
+                    ) : (
+                      <TrendingDown className={`w-4 h-4 ${trendColor}`} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{trade.symbol}</h4>
+                      <span className={`px-1.5 py-0.5 text-xs rounded-full flex items-center gap-1 ${trendBg} ${trendColor}`}>
+                        <Activity className="w-2.5 h-2.5" />
+                        Live
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Day {currentDay}/{durationDays} • {formatDaysRemaining()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Profit & Expand Icon */}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className={`flex items-center gap-1 ${trendColor}`}>
+                      <TrendIcon className="w-3 h-3" />
+                      <span className="font-bold">
+                        ${Math.abs(profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {progress.toFixed(0)}% complete
+                    </p>
+                  </div>
+                  <div className={`p-1 rounded-full ${trendBg}`}>
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Mini Progress Bar - Always Visible */}
+              <div className="mt-2">
+                <Progress value={progress} className="h-1" />
+              </div>
+            </div>
+
+            {/* Expanded Details */}
+            {isExpanded && (
+              <div className="px-3 pb-3 border-t border-border/50 pt-3 space-y-3">
+                {/* Investment & ROI Row */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Invested:</span>
+                  <span className="font-medium">${allocatedBalance.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">ROI:</span>
+                  <span className={`font-medium ${trendColor}`}>
+                    {allocatedBalance > 0 ? ((profit / allocatedBalance) * 100).toFixed(2) : '0.00'}%
+                  </span>
+                </div>
+
+                {/* Live Price Movement Indicator */}
+                <div className={`flex items-center justify-between p-2 rounded-lg ${trendBg}`}>
+                  <div className="flex items-center gap-2">
+                    {isUp ? (
+                      <TrendingUp className={`w-4 h-4 ${trendColor}`} />
+                    ) : (
+                      <TrendingDown className={`w-4 h-4 ${trendColor}`} />
+                    )}
+                    <span className={`text-sm font-medium ${trendColor}`}>
+                      {isUp ? 'Price Rising' : 'Price Dipping'}
+                    </span>
+                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${trendBg} ${trendColor}`}>
+                      {isUp ? '+' : '-'}{percentChange.toFixed(1)}%
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Live
+                  </span>
+                </div>
+
+                {/* Progress Bar with Details */}
+                <div>
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                    <span>Progress: {progress.toFixed(1)}%</span>
+                    <span>Target: ${expectedProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="relative">
+                    <Progress value={progress} className="h-2" />
+                    <div
+                      className={`absolute top-0 h-2 w-1 rounded-full animate-pulse ${isUp ? 'bg-green-400' : 'bg-red-400'}`}
+                      style={{ left: `${Math.min(99, progress)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span className={trendColor}>
+                      {isUp ? '↗ Gaining' : '↘ Pulling back'}
+                    </span>
+                    <span className="font-medium">
+                      ${(allocatedBalance + expectedProfit).toLocaleString()} at completion
+                    </span>
+                  </div>
+                </div>
+
+                {/* Profit Breakdown */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground">Current</p>
+                    <p className={`text-sm font-bold ${trendColor}`}>
+                      ${profit.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground">Target</p>
+                    <p className="text-sm font-bold text-blue-500">
+                      ${expectedProfit.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground">Remaining</p>
+                    <p className="text-sm font-bold">
+                      ${Math.max(0, expectedProfit - profit).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bot Info */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {trade.metadata?.botType || 'trend'} bot
+                    </Badge>
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {trade.metadata?.tradingMode || 'balanced'}
+                    </Badge>
+                  </div>
+                  <span>Started {new Date(startDate).toLocaleDateString()}</span>
+                </div>
+
+                {/* Stop Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleStopBotTrade(trade.id)
+                  }}
+                  className="w-full"
+                >
+                  <StopCircle className="w-4 h-4 mr-2" />
+                  Stop Bot & Collect ${(allocatedBalance + profit).toFixed(2)}
+                </Button>
+              </div>
+            )}
           </div>
         )
       })}
@@ -759,23 +925,27 @@ const handleStartBotTrade = async () => {
                   <ul className="space-y-2 text-sm text-green-600/80">
                     <li className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
-                      <span><strong>Higher Investment = Higher %:</strong> $100 gets 5%, $1000 gets 10%, $5000 gets 20%, $10000+ gets 25%</span>
+                      <span><strong>High-Yield Returns:</strong> Earn 5x-50x your investment based on trading mode</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
-                      <span><strong>Fixed 7-Day Cycle:</strong> All bots run for exactly 7 days</span>
+                      <span><strong>Conservative Mode:</strong> 5x-10x returns (e.g., $200 → $1,000-$2,000 profit)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
-                      <span><strong>Trading Mode Multiplier:</strong> Conservative (1x), Balanced (1.5x), Aggressive (2x)</span>
+                      <span><strong>Balanced Mode:</strong> 15x-25x returns (e.g., $200 → $3,000-$5,000 profit)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
-                      <span><strong>Auto-Stop & Payout:</strong> Bot stops automatically after 7 days, profits are paid</span>
+                      <span><strong>Aggressive Mode:</strong> 30x-50x returns (e.g., $200 → $6,000-$10,000 profit)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
-                      <span><strong>Accelerated Processing:</strong> Progress may be accelerated based on market conditions</span>
+                      <span><strong>Investment Bonus:</strong> Higher investments get up to 25% extra profit boost</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5"></div>
+                      <span><strong>7-Day Trading Cycle:</strong> Bot trades for 7 days, then auto-completes with full payout</span>
                     </li>
                   </ul>
                 </div>

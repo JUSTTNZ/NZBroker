@@ -68,6 +68,8 @@ export default function UpdateBotProgressPage() {
   const [runningBots, setRunningBots] = useState<BotTrade[]>([])
   const [selectedBot, setSelectedBot] = useState<BotTrade | null>(null)
   const [progressValue, setProgressValue] = useState(0)
+  const [profitValue, setProfitValue] = useState(0)
+  const [updateMode, setUpdateMode] = useState<'progress' | 'profit'>('profit') // Default to profit mode
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
 
@@ -139,31 +141,43 @@ export default function UpdateBotProgressPage() {
     loadRunningBots()
   }, [loadRunningBots])
 
-  // Update bot progress
+  // Update bot progress or profit
   const handleUpdateProgress = async () => {
-    if (!selectedBot || !progressValue) {
-      toast.error('Please select a bot and progress value')
+    if (!selectedBot) {
+      toast.error('Please select a bot')
+      return
+    }
+
+    const value = updateMode === 'profit' ? profitValue : progressValue
+    if (!value && value !== 0) {
+      toast.error(`Please enter a ${updateMode === 'profit' ? 'profit amount' : 'progress value'}`)
       return
     }
 
     setUpdating(selectedBot.id)
     try {
-      console.log(`[UpdateBotProgress] Updating progress for bot ${selectedBot.id} to ${progressValue}%`)
-      
-      const result = await adminUpdateBotProgress(selectedBot.id, progressValue)
-      
+      console.log(`[UpdateBotProgress] Updating ${updateMode} for bot ${selectedBot.id} to ${value}`)
+
+      const result = await adminUpdateBotProgress(selectedBot.id, value, { valueType: updateMode })
+
       if (result.success) {
-        toast.success(`Bot progress updated to ${result.progress}%`)
-        
+        toast.success(
+          updateMode === 'profit'
+            ? `Bot profit updated to $${result.currentProfit.toLocaleString()}`
+            : `Bot progress updated to ${result.progress}%`
+        )
+
         // Update local state
         setRunningBots(prev => prev.map(bot => {
           if (bot.id === selectedBot.id) {
             return {
               ...bot,
+              profit_loss: result.currentProfit,
               metadata: {
                 ...bot.metadata,
                 progress: result.progress,
                 current_profit: result.currentProfit,
+                admin_profit: result.currentProfit,
                 admin_updated: true,
                 admin_updated_at: new Date().toISOString()
               }
@@ -175,20 +189,22 @@ export default function UpdateBotProgressPage() {
         // Update selected bot
         const updatedBot = {
           ...selectedBot,
+          profit_loss: result.currentProfit,
           metadata: {
             ...selectedBot.metadata,
             progress: result.progress,
-            current_profit: result.currentProfit
+            current_profit: result.currentProfit,
+            admin_profit: result.currentProfit
           }
         }
         setSelectedBot(updatedBot)
-        
+
       } else {
-        toast.error('Failed to update bot progress')
+        toast.error('Failed to update bot')
       }
     } catch (error: any) {
-      console.error('[UpdateBotProgress] Error updating progress:', error)
-      toast.error(error.message || 'Failed to update bot progress')
+      console.error('[UpdateBotProgress] Error updating:', error)
+      toast.error(error.message || 'Failed to update bot')
     } finally {
       setUpdating(null)
     }
@@ -245,12 +261,14 @@ export default function UpdateBotProgressPage() {
   const handleSelectBot = (bot: BotTrade) => {
     setSelectedBot(bot)
     setProgressValue(bot.metadata?.progress || 0)
+    setProfitValue(bot.metadata?.current_profit || bot.profit_loss || 0)
   }
 
   // Clear selection
   const handleClearSelection = () => {
     setSelectedBot(null)
     setProgressValue(0)
+    setProfitValue(0)
   }
 
   // Format currency
@@ -493,113 +511,186 @@ export default function UpdateBotProgressPage() {
 
                 <Separator />
 
-                {/* Progress Update Section */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Update Progress</p>
-                      <p className="text-sm text-muted-foreground">
-                        Set new progress percentage
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[25, 50, 75, 100].map((value) => (
-                        <Button
-                          key={value}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setProgressValue(value)}
-                          className={`h-8 px-2 ${progressValue === value ? 'bg-primary text-primary-foreground' : ''}`}
-                        >
-                          {value}%
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>New Progress</span>
-                      <span className="font-medium">{progressValue}%</span>
-                    </div>
-                    <Slider
-                      value={[progressValue]}
-                      onValueChange={(value) => setProgressValue(value[0])}
-                      max={100}
-                      step={1}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>0%</span>
-                      <span>25%</span>
-                      <span>50%</span>
-                      <span>75%</span>
-                      <span>100%</span>
-                    </div>
-                  </div>
-
-                  {/* Profit Preview */}
-                  <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                    <p className="font-medium">Profit Preview</p>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Current Profit</p>
-                        <p className="font-medium">
-                          {formatCurrency(selectedBot.metadata?.current_profit || 0)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">After Update</p>
-                        <p className="font-medium text-green-500">
-                          {formatCurrency((selectedBot.config?.expectedProfit || 0) * progressValue / 100)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Profit Increase</p>
-                        <p className="font-medium text-green-500">
-                          +{formatCurrency(
-                            ((selectedBot.config?.expectedProfit || 0) * progressValue / 100) - 
-                            (selectedBot.metadata?.current_profit || 0)
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Progress Change</p>
-                        <p className="font-medium">
-                          {selectedBot.metadata?.progress?.toFixed(1) || 0}% → {progressValue}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Update Button */}
+                {/* Update Mode Toggle */}
+                <div className="flex gap-2 p-1 bg-muted rounded-lg">
                   <Button
-                    onClick={handleUpdateProgress}
-                    disabled={updating === selectedBot.id || !progressValue}
-                    className="w-full"
-                    size="lg"
+                    variant={updateMode === 'profit' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setUpdateMode('profit')}
+                    className="flex-1"
                   >
-                    {updating === selectedBot.id ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Update Progress to {progressValue}%
-                      </>
-                    )}
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Set Profit Amount
                   </Button>
-
-                  <Alert>
-                    <AlertCircle className="w-4 h-4" />
-                    <AlertDescription className="text-sm">
-                      Updating progress will recalculate the user's profit based on the new percentage. 
-                      This action cannot be undone.
-                    </AlertDescription>
-                  </Alert>
+                  <Button
+                    variant={updateMode === 'progress' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setUpdateMode('progress')}
+                    className="flex-1"
+                  >
+                    <Percent className="w-4 h-4 mr-2" />
+                    Set Progress %
+                  </Button>
                 </div>
+
+                {/* Profit Mode */}
+                {updateMode === 'profit' && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="font-medium mb-2">Set Direct Profit Amount</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Enter the exact profit the user should see
+                      </p>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <input
+                            type="number"
+                            value={profitValue}
+                            onChange={(e) => setProfitValue(Number(e.target.value))}
+                            className="w-full pl-8 pr-4 py-2 border rounded-lg bg-background"
+                            placeholder="Enter profit amount"
+                            min={0}
+                          />
+                        </div>
+                      </div>
+                      {/* Quick profit buttons */}
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {[1000, 2500, 5000, 10000, 25000, 50000].map((amount) => (
+                          <Button
+                            key={amount}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setProfitValue(amount)}
+                            className={profitValue === amount ? 'bg-primary text-primary-foreground' : ''}
+                          >
+                            ${amount.toLocaleString()}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Preview */}
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <p className="font-medium text-green-700 dark:text-green-400 mb-3">Profit Preview</p>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Current</p>
+                          <p className="font-medium">{formatCurrency(selectedBot.metadata?.current_profit || 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">New Profit</p>
+                          <p className="font-bold text-green-600 text-lg">{formatCurrency(profitValue)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Expected Total</p>
+                          <p className="font-medium">{formatCurrency(selectedBot.config?.expectedProfit || 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Progress</p>
+                          <p className="font-medium">
+                            {selectedBot.config?.expectedProfit
+                              ? ((profitValue / selectedBot.config.expectedProfit) * 100).toFixed(1)
+                              : 0}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress Mode */}
+                {updateMode === 'progress' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">Update Progress</p>
+                        <p className="text-sm text-muted-foreground">
+                          Set new progress percentage
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {[25, 50, 75, 100].map((value) => (
+                          <Button
+                            key={value}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setProgressValue(value)}
+                            className={`h-8 px-2 ${progressValue === value ? 'bg-primary text-primary-foreground' : ''}`}
+                          >
+                            {value}%
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>New Progress</span>
+                        <span className="font-medium">{progressValue}%</span>
+                      </div>
+                      <Slider
+                        value={[progressValue]}
+                        onValueChange={(value) => setProgressValue(value[0])}
+                        max={100}
+                        step={1}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Profit Preview */}
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                      <p className="font-medium">Profit Preview</p>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">After Update</p>
+                          <p className="font-medium text-green-500">
+                            {formatCurrency((selectedBot.config?.expectedProfit || 0) * progressValue / 100)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Progress</p>
+                          <p className="font-medium">
+                            {selectedBot.metadata?.progress?.toFixed(1) || 0}% → {progressValue}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Update Button */}
+                <Button
+                  onClick={handleUpdateProgress}
+                  disabled={updating === selectedBot.id}
+                  className="w-full"
+                  size="lg"
+                >
+                  {updating === selectedBot.id ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      {updateMode === 'profit'
+                        ? `Set Profit to ${formatCurrency(profitValue)}`
+                        : `Update Progress to ${progressValue}%`
+                      }
+                    </>
+                  )}
+                </Button>
+
+                <Alert>
+                  <AlertCircle className="w-4 h-4" />
+                  <AlertDescription className="text-sm">
+                    {updateMode === 'profit'
+                      ? 'Setting profit will directly update what the user sees. The user will immediately see this profit amount.'
+                      : 'Updating progress will recalculate profit based on the percentage of expected profit.'
+                    }
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
           ) : (

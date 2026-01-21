@@ -3,12 +3,19 @@
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, Eye, Wallet, CreditCard, ArrowUpRight, Settings, LucideSwitchCamera, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import {
+  TrendingUp, TrendingDown, Eye, Wallet, CreditCard, ArrowUpRight,
+  Settings, ArrowRightLeft, AlertCircle, Loader2, Bot, Activity,
+  ArrowUp, ArrowDown, ChevronDown, ChevronUp, RefreshCw
+} from "lucide-react"
 import { ScrollingTicker } from "@/components/scrolling-ticker"
 import { AdvancedChartWidget, MiniSymbolChart, MarketOverviewWidget } from "@/components/tradingview-widgets"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBotTrades } from "@/components/action/bot-trading"
 
 interface Withdrawal {
   id: string
@@ -25,6 +32,9 @@ export default function DashboardPage() {
   const router = useRouter()
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false)
   const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null)
+  const [activeBotTrades, setActiveBotTrades] = useState<any[]>([])
+  const [loadingBots, setLoadingBots] = useState(false)
+  const [expandedBots, setExpandedBots] = useState<Set<string>>(new Set())
 
   // Calculate total profit (example - you should get this from transactions)
   const calculateTotalProfit = () => {
@@ -39,18 +49,21 @@ export default function DashboardPage() {
   const botBalance = currentWallet ? `$${currentWallet.bot_trading_balance.toLocaleString()}` : "$0.00"
   const bonusBalance = currentWallet ? `$${currentWallet.bonus_balance.toLocaleString()}` : "$0.00"
 
-  const handleAccountSwitch = async () => {
+  const handleAccountSwitch = async (targetType?: "demo" | "live") => {
     if (!userProfile || isSwitchingAccount) return
-    
+
+    const newAccountType = targetType || (userProfile.account_type === "demo" ? "live" : "demo")
+
+    // Don't switch if already on that account type
+    if (userProfile.account_type === newAccountType) return
+
     setIsSwitchingAccount(true)
     try {
-      const newAccountType = userProfile.account_type === "demo" ? "live" : "demo"
       await switchAccountType(newAccountType)
-      // Refresh data after switching
+      // Refresh data after switching to get updated wallet balances
       await refreshAllData()
     } catch (error) {
       console.error("Failed to switch account:", error)
-      alert(error instanceof Error ? error.message : "Failed to switch account")
     } finally {
       setIsSwitchingAccount(false)
     }
@@ -67,7 +80,7 @@ export default function DashboardPage() {
 useEffect(() => {
   const fetchPendingWithdrawal = async () => {
     if (!user) return
-    
+
     try {
       const supabase = createClient()
       const { data } = await supabase
@@ -77,7 +90,7 @@ useEffect(() => {
         .eq("status", "payment_pending")
         .order("created_at", { ascending: false })
         .limit(1)
-      
+
       if (data && data.length > 0) {
         setPendingWithdrawal(data[0])
       } else {
@@ -87,9 +100,50 @@ useEffect(() => {
       console.error("Error fetching pending withdrawal:", error)
     }
   }
-  
+
   fetchPendingWithdrawal()
 }, [user])
+
+// Fetch active bot trades for current account type
+const fetchActiveBots = async () => {
+  if (!user || !userProfile) return
+
+  // Only fetch if user has pro or elite plan (can use bot trading)
+  if (userProfile.current_plan === 'basic') {
+    setActiveBotTrades([])
+    return
+  }
+
+  setLoadingBots(true)
+  try {
+    // Pass current account type to get trades for that account only
+    const trades = await getActiveBotTrades(userProfile.account_type)
+    setActiveBotTrades(trades || [])
+  } catch (error: any) {
+    if (error.message !== 'Authentication required') {
+      console.error("Error fetching bot trades:", error)
+    }
+    setActiveBotTrades([])
+  } finally {
+    setLoadingBots(false)
+  }
+}
+
+useEffect(() => {
+  if (user && userProfile) {
+    fetchActiveBots()
+  }
+
+  // Refresh every 10 seconds
+  const interval = setInterval(() => {
+    if (user && userProfile) {
+      fetchActiveBots()
+    }
+  }, 10000)
+
+  return () => clearInterval(interval)
+// Re-fetch when account type changes
+}, [user, userProfile?.account_type])
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -106,17 +160,39 @@ useEffect(() => {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleAccountSwitch}
-            disabled={isSwitchingAccount}
-            className="flex items-center gap-2"
-          >
-            <LucideSwitchCamera className="w-4 h-4" />
-            {isSwitchingAccount ? '' : `Switch to ${userProfile?.account_type === "demo" ? "Live" : "Demo"}`}
-          </Button>
-      
+          {/* Account Type Toggle Buttons */}
+          <div className="flex items-center bg-muted rounded-lg p-1">
+            <button
+              onClick={() => handleAccountSwitch("demo")}
+              disabled={isSwitchingAccount}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                userProfile?.account_type === "demo"
+                  ? "bg-yellow-500 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {isSwitchingAccount && userProfile?.account_type !== "demo" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Demo"
+              )}
+            </button>
+            <button
+              onClick={() => handleAccountSwitch("live")}
+              disabled={isSwitchingAccount}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                userProfile?.account_type === "live"
+                  ? "bg-green-500 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {isSwitchingAccount && userProfile?.account_type !== "live" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Live"
+              )}
+            </button>
+          </div>
         </div>
       </div>
       {pendingWithdrawal && (
@@ -161,7 +237,89 @@ useEffect(() => {
   </Card>
 )}
 
+{/* Active Bot Trades Section - Compact */}
+{activeBotTrades.length > 0 && (
+  <Card className="p-3 md:p-4 border-purple-500/30 bg-purple-500/5 animate-fade-in-up">
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <Bot className="w-4 h-4 text-purple-500" />
+        <h3 className="font-semibold">Active Bots</h3>
+        <Badge variant="outline" className="text-purple-500 border-purple-500/50 text-xs">
+          {activeBotTrades.length}
+        </Badge>
+        <Badge variant="outline" className="text-xs capitalize">
+          {userProfile?.account_type}
+        </Badge>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchActiveBots} disabled={loadingBots}>
+          <RefreshCw className={`w-3 h-3 ${loadingBots ? 'animate-spin' : ''}`} />
+        </Button>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard/analysis-bot')}>
+          Manage
+        </Button>
+      </div>
+    </div>
 
+    {/* Compact Bot List - Max 3 visible, scrollable */}
+    <div className="space-y-2 max-h-[180px] overflow-y-auto">
+      {activeBotTrades.map((trade) => {
+        const profit = trade.profit_loss || 0
+        const progress = trade.metadata?.progress || 0
+        const trend = trade.metadata?.trend || 'up'
+        const durationDays = trade.metadata?.durationDays || 7
+        const startDate = trade.metadata?.startDate ? new Date(trade.metadata.startDate) : new Date(trade.created_at)
+        const now = new Date()
+        const daysPassed = Math.min(durationDays, Math.max(0, now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+        const currentDay = Math.min(durationDays, Math.max(1, Math.ceil(daysPassed)))
+
+        const isUp = trend === 'up'
+        const trendColor = isUp ? 'text-green-500' : 'text-red-500'
+        const trendBg = isUp ? 'bg-green-500/10' : 'bg-red-500/10'
+
+        return (
+          <div
+            key={trade.id}
+            className={`p-2 rounded-lg border cursor-pointer hover:bg-muted/20 transition-all ${
+              isUp ? 'border-green-500/20' : 'border-red-500/20'
+            }`}
+            onClick={() => router.push('/dashboard/analysis-bot')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`p-1.5 rounded ${trendBg}`}>
+                  {isUp ? <TrendingUp className={`w-3 h-3 ${trendColor}`} /> : <TrendingDown className={`w-3 h-3 ${trendColor}`} />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium text-sm">{trade.symbol}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Day {currentDay}/{durationDays}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`font-bold text-sm ${trendColor}`}>
+                  ${profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground">{progress.toFixed(0)}%</p>
+              </div>
+            </div>
+            <Progress value={progress} className="h-1 mt-1.5" />
+          </div>
+        )
+      })}
+    </div>
+
+    {/* Compact Summary */}
+    <div className="flex justify-between items-center mt-3 pt-2 border-t border-purple-500/20 text-sm">
+      <span className="text-muted-foreground">Total Profit:</span>
+      <span className="font-bold text-green-500">
+        +${activeBotTrades.reduce((sum, t) => sum + (t.profit_loss || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+      </span>
+    </div>
+  </Card>
+)}
 
 
       <ScrollingTicker />
@@ -399,11 +557,13 @@ useEffect(() => {
             subtext: "+5% this week", 
             color: "text-green-400" 
           },
-          { 
-            label: "Active Bots", 
-            value: currentWallet?.bot_trading_balance && currentWallet.bot_trading_balance > 0 ? "1" : "0", 
-            subtext: currentWallet?.bot_trading_balance && currentWallet.bot_trading_balance > 0 ? "Running" : "Inactive", 
-            color: "text-purple-400" 
+          {
+            label: "Active Bots",
+            value: activeBotTrades.length.toString(),
+            subtext: activeBotTrades.length > 0
+              ? `+$${activeBotTrades.reduce((sum, t) => sum + (t.profit_loss || 0), 0).toFixed(0)} profit`
+              : "No active bots",
+            color: "text-purple-400"
           },
         ].map((stat, i) => (
           <Card

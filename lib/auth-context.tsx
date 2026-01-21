@@ -115,8 +115,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!walletsError && userWallets) {
         setWallets(userWallets as Wallet[])
         const profileAccountType = (profile as UserProfile)?.account_type || "demo"
+        // Find the wallet that matches the user's current account type
         const current = userWallets?.find((w: any) => w.account_type === profileAccountType)
-        setCurrentWallet(current || userWallets?.[0] || null)
+        if (current) {
+          setCurrentWallet(current)
+        } else {
+          // If no matching wallet found, try to find demo wallet as fallback
+          const demoWallet = userWallets?.find((w: any) => w.account_type === "demo")
+          setCurrentWallet(demoWallet || null)
+        }
       }
 
       if (!plansError && plans) {

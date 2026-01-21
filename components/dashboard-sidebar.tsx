@@ -30,12 +30,12 @@ const IconComponents = {
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
   { href: "/dashboard/copy-trading", label: "Copy Trading", icon: "Copy" },
-  { href: "/dashboard/stock-trade", label: "Stock Trade", icon: "TrendingUp" },
+  { href: "/dashboard/stock-trade", label: "Trade", icon: "TrendingUp" },
   { href: "/dashboard/upgrade-plan", label: "Upgrade Plan", icon: "Star" },
   { href: "/dashboard/account", label: "Account", icon: "User" },
   { href: "/dashboard/deposit", label: "Deposit", icon: "DollarSign" },
   { href: "/dashboard/withdraw", label: "Withdraw", icon: "PiggyBank" },
-  { href: "/dashboard/analysis-bot", label: "Analysis Bot", icon: "Bot" },
+  { href: "/dashboard/analysis-bot", label: "AI Trading Bot", icon: "Bot" },
   { href: "/dashboard/referral-program", label: "Referral Program", icon: "Share2" },
   { href: "/dashboard/kyc", label: "KYC", icon: "CheckCircle" },
   { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
@@ -139,19 +139,19 @@ export function DashboardSidebar() {
 
       {/* Sidebar - Optimized */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-[90] ${
+        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-[90] flex flex-col ${
           // Always expanded width on mobile when open
           isMobileOpen || isExpanded ? "w-64" : "w-20"
         } ${
-          isMobileOpen 
-            ? "translate-x-0 shadow-2xl" 
+          isMobileOpen
+            ? "translate-x-0 shadow-2xl"
             : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Header with collapse toggle */}
-        <div className="p-4 border-b border-sidebar-border flex items-center justify-between h-16">
+        <div className="p-3 border-b border-sidebar-border flex items-center justify-between">
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-sidebar-primary truncate">AstralisX</h2>
+            <h2 className="text-lg font-bold text-sidebar-primary truncate">AstralisX</h2>
             <p className="text-xs text-sidebar-foreground/60 truncate">Vault</p>
           </div>
           
@@ -182,33 +182,29 @@ export function DashboardSidebar() {
           )}
         </div>
 
-        {/* User Info Section - Shows when user is logged in */}
-    
-
         {/* Navigation Links - Optimized */}
-        <div className="h-[calc(100vh-128px-80px)] overflow-y-auto">
-          <nav className="space-y-1 px-3 py-4">
+        <div className="flex-1 flex flex-col">
+          <nav className="flex-1 px-3 py-2">
             {sidebarLinks.map((link) => {
               const IconComponent = IconComponents[link.icon as keyof typeof IconComponents]
               const active = isActive(link.href)
-              
+
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors group ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group ${
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  } justify-start`} // Always justify-start when sidebar is open on mobile
-                  onClick={() => setIsMobileOpen(false)} // Close mobile sidebar on link click
+                  } justify-start`}
+                  onClick={() => setIsMobileOpen(false)}
                 >
                   {IconComponent ? (
                     <IconComponent className="w-5 h-5 flex-shrink-0" />
                   ) : (
                     <IconFallback />
                   )}
-                  {/* Always show labels when sidebar is open (mobile or expanded) */}
                   <span className="text-sm font-medium truncate">
                     {link.label}
                   </span>
@@ -216,18 +212,18 @@ export function DashboardSidebar() {
               )
             })}
           </nav>
-        </div>
 
-        {/* Sign Out - Fixed at bottom */}
-        <div className="absolute bottom-0 pointer left-0 right-0 p-3 border-t border-sidebar-border bg-sidebar">
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors justify-start"
-            disabled={!user} // Disable if no user is logged in
-          >
-            <IconComponents.LogOut className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm font-medium">Sign Out</span>
-          </button>
+          {/* Sign Out - Right below nav links */}
+          <div className="px-3 py-2 border-t border-sidebar-border">
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors justify-start"
+              disabled={!user}
+            >
+              <IconComponents.LogOut className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">Sign Out</span>
+            </button>
+          </div>
         </div>
       </aside>
 

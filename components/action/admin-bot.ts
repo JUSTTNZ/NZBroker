@@ -351,69 +351,114 @@ export async function adminGetBotTrade(botTradeId: string) {
   }
 }
 
-// Admin function to update bot progress (admin can update any bot)
-export async function adminUpdateBotProgress(botTradeId: string, progress: number) {
+// Admin function to update bot progress or profit directly
+// Can pass either progress percentage OR direct profit amount
+export async function adminUpdateBotProgress(
+  botTradeId: string,
+  value: number,
+  options?: {
+    valueType?: 'progress' | 'profit'; // 'progress' = percentage, 'profit' = direct dollar amount
+    newDurationDays?: number;
+  }
+) {
+  const valueType = options?.valueType || 'progress' // Default to progress percentage for backwards compatibility
+
   try {
     const supabase = await createClient()
-    
-    // Update bot progress in metadata
+
+    // Fetch bot trade details
     const { data: botTrade, error: fetchError } = await supabase
       .from('bot_trades')
-      .select('metadata, status, user_id, config')
+      .select('metadata, status, user_id, config, created_at')
       .eq('id', botTradeId)
       .single()
-    
+
     if (fetchError || !botTrade) {
       throw new Error('Bot trade not found')
     }
-    
-    const validatedProgress = Math.min(100, Math.max(0, progress))
-    
-    // Calculate current profit based on new progress
+
     const expectedProfit = botTrade.config?.expectedProfit || 0
-    const currentProfit = (expectedProfit * validatedProgress) / 100
-    
+    const allocatedBalance = botTrade.metadata?.allocated_balance || 0
+
+    let currentProfit: number
+    let validatedProgress: number
+
+    if (valueType === 'profit') {
+      // Admin set a direct profit amount
+      currentProfit = Math.max(0, value)
+      validatedProgress = expectedProfit > 0 ? Math.min(100, (currentProfit / expectedProfit) * 100) : 0
+      console.log('[adminUpdateBotProgress] Direct profit set:', currentProfit, 'Calculated progress:', validatedProgress + '%')
+    } else {
+      // Admin set a progress percentage
+      validatedProgress = Math.min(100, Math.max(0, value))
+      currentProfit = (expectedProfit * validatedProgress) / 100
+      console.log('[adminUpdateBotProgress] Progress set:', validatedProgress + '%', 'Calculated profit:', currentProfit)
+    }
+
+    // Handle duration adjustment
+    let newEndDate = botTrade.metadata?.endDate
+    let newDurationDays = botTrade.metadata?.durationDays || 7
+
+    if (options?.newDurationDays && options.newDurationDays > 0) {
+      newDurationDays = options.newDurationDays
+      const startDate = botTrade.metadata?.startDate ? new Date(botTrade.metadata.startDate) : new Date(botTrade.created_at)
+      newEndDate = new Date(startDate.getTime() + newDurationDays * 24 * 60 * 60 * 1000).toISOString()
+    }
+
+    // Update bot with admin values - set BOTH admin_profit and admin_progress
     const { error: updateError } = await supabase
       .from('bot_trades')
       .update({
+        // Update profit_loss directly on the record
+        profit_loss: currentProfit,
+        profit_loss_percent: allocatedBalance > 0 ? (currentProfit / allocatedBalance) * 100 : 0,
         metadata: {
           ...botTrade.metadata,
           progress: validatedProgress,
           current_profit: currentProfit,
+          admin_profit: currentProfit, // This is what getActiveBotTrades looks for!
+          admin_progress: validatedProgress,
           admin_updated: true,
-          admin_updated_at: new Date().toISOString()
+          admin_updated_at: new Date().toISOString(),
+          endDate: newEndDate,
+          durationDays: newDurationDays
         }
       })
       .eq('id', botTradeId)
-    
+
     if (updateError) {
-      throw new Error('Failed to update bot progress')
+      console.error('[adminUpdateBotProgress] Update error:', updateError)
+      throw new Error('Failed to update bot')
     }
-    
+
+    console.log('[adminUpdateBotProgress] Bot updated. Profit:', currentProfit, 'Progress:', validatedProgress + '%')
+
     // If progress reaches 100% and bot is still running, auto-complete it
     if (validatedProgress >= 100 && botTrade.status === 'running') {
       await adminStopBotTrade(botTradeId)
     }
-    
-    // Create notification for user
+
+    // Create notification for user (don't mention admin)
     await supabase.from('notifications').insert({
       user_id: botTrade.user_id,
-      title: 'Bot Progress Update',
-      message: `Great news! Your trading bot progress has reached ${validatedProgress.toFixed(1)}%. Current profit: $${currentProfit.toFixed(2)}`,
+      title: 'Trading Bot Update',
+      message: `Your trading bot is performing excellently! Current profit: $${currentProfit.toLocaleString()} (${validatedProgress.toFixed(1)}% of target)`,
       type: 'bot_progress_updated',
       metadata: {
         bot_trade_id: botTradeId,
         new_progress: validatedProgress,
-        current_profit: currentProfit,
-        admin_updated: true
+        current_profit: currentProfit
       }
     })
-    
+
     revalidatePath('/dashboard/bot-trading')
+    revalidatePath('/dashboard/analysis-bot')
     revalidatePath('/admin/bot')
-    
+    revalidatePath('/admin/updatebot')
+
     return { success: true, progress: validatedProgress, currentProfit }
   } catch (error: any) {
+    console.error('[adminUpdateBotProgress] Error:', error)
     throw error
   }
 }

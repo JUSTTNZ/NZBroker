@@ -32,8 +32,8 @@ export function AboutUs() {
             </p>
             <p className="text-lg text-muted-foreground">
               We believe that successful trading should be accessible, transparent, and fair. That's why we've
-              engineered every aspect of AstralisX Vault from the ground up—from our low-latency execution engine to our
-              institutional-grade market analysis tools—to give you a competitive edge in your trading journey.
+              engineered every aspect of AstralisX Vault from the ground up from our low-latency execution engine to our
+              institutional-grade market analysis tools to give you a competitive edge in your trading journey.
             </p>
             <p className="text-lg text-muted-foreground">
               Whether you're a seasoned institutional trader or just beginning your financial markets exploration,
