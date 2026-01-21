@@ -3,14 +3,32 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building, Wallet, Copy, Check, Loader2, Shield } from "lucide-react"
+import { Building, Wallet, Copy, Check, Loader2, Shield, AlertTriangle, ArrowRightLeft } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
 export default function WithdrawPage() {
-  const { user, currentWallet, userProfile, refreshAllData } = useAuth()
+  const { user, currentWallet, userProfile, refreshAllData, switchAccountType } = useAuth()
+  const router = useRouter()
   const [amount, setAmount] = useState("")
+  const [isSwitching, setIsSwitching] = useState(false)
+
+  // Check if user is on demo account
+  const isDemoAccount = userProfile?.account_type === "demo"
+
+  const handleSwitchToLive = async () => {
+    setIsSwitching(true)
+    try {
+      await switchAccountType("live")
+      await refreshAllData()
+    } catch (error) {
+      console.error("Failed to switch account:", error)
+    } finally {
+      setIsSwitching(false)
+    }
+  }
   const [selectedMethod, setSelectedMethod] = useState("bank")
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -52,6 +70,12 @@ export default function WithdrawPage() {
   const handleWithdraw = async () => {
     if (!user) {
       toast.error("Please login to withdraw")
+      return
+    }
+
+    // Block demo account withdrawals
+    if (isDemoAccount) {
+      toast.error("Withdrawals are not available for demo accounts. Please switch to a live account.")
       return
     }
 
@@ -211,19 +235,20 @@ export default function WithdrawPage() {
   // Determine if withdrawal is allowed
   const canWithdraw = () => {
     if (!user) return false
-    
+    if (isDemoAccount) return false // Block demo account withdrawals
+
     const withdrawAmount = parseFloat(amount)
     if (!amount || withdrawAmount <= 0) return false
     if (withdrawAmount > totalAvailableBalance) return false
-    
+
     // Method-specific minimums
     if (selectedMethod === "bank" && withdrawAmount < 100) return false
     if (selectedMethod === "crypto" && withdrawAmount < 100) return false
-    
+
     // Check if required fields are filled
     if (selectedMethod === "bank" && (!bankAccountName || !bankAccountNumber)) return false
     if (selectedMethod === "crypto" && !cryptoAddress) return false
-    
+
     return true
   }
 
@@ -233,6 +258,36 @@ export default function WithdrawPage() {
         <h1 className="text-3xl font-bold mb-2">Withdraw Funds</h1>
         <p className="text-muted-foreground">Withdraw from your Total Available Balance</p>
       </div>
+
+      {/* Demo Account Warning */}
+      {isDemoAccount && (
+        <Card className="p-6 bg-yellow-500/10 border-yellow-500/30">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <AlertTriangle className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-yellow-600 mb-1">Demo Account - Withdrawals Not Available</h3>
+                <p className="text-sm text-yellow-700">
+                  You are currently using a demo account. Withdrawals are only available for live accounts with real funds.
+                  Switch to your live account to make a withdrawal.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleSwitchToLive}
+              disabled={isSwitching}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white gap-2 whitespace-nowrap"
+            >
+              {isSwitching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRightLeft className="w-4 h-4" />
+              )}
+              Switch to Live
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Balance Summary */}
       <Card className="p-6 bg-card/50 border-border/40">
@@ -266,9 +321,9 @@ export default function WithdrawPage() {
       </Card>
 
       {/* Withdrawal Method Selection */}
-      <Card className="p-6 bg-card/50 border-border/40">
+      <Card className={`p-6 bg-card/50 border-border/40 ${isDemoAccount ? "opacity-50 pointer-events-none" : ""}`}>
         <h3 className="text-xl font-semibold mb-6">Select Withdrawal Method</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {withdrawalMethods.map((method) => {
             const IconComponent = method.icon
@@ -280,7 +335,7 @@ export default function WithdrawPage() {
                     ? "border-primary bg-primary/10"
                     : "border-border/40 bg-card/30 hover:border-primary/50"
                 }`}
-                onClick={() => setSelectedMethod(method.id)}
+                onClick={() => !isDemoAccount && setSelectedMethod(method.id)}
               >
                 <IconComponent className={`w-8 h-8 ${method.color} mb-4`} />
                 <h3 className="font-semibold text-lg mb-1">{method.name}</h3>
@@ -292,7 +347,7 @@ export default function WithdrawPage() {
       </Card>
 
       {/* Bank Withdrawal Form */}
-      {selectedMethod === "bank" && (
+      {selectedMethod === "bank" && !isDemoAccount && (
         <Card className="p-8 bg-card/50 border-border/40">
           <h3 className="text-xl font-semibold mb-6">Bank Withdrawal</h3>
 
@@ -386,7 +441,7 @@ export default function WithdrawPage() {
       )}
 
       {/* Cryptocurrency Withdrawal Form */}
-      {selectedMethod === "crypto" && (
+      {selectedMethod === "crypto" && !isDemoAccount && (
         <Card className="p-8 bg-card/50 border-border/40">
           <h3 className="text-xl font-semibold mb-6">Cryptocurrency Withdrawal</h3>
 

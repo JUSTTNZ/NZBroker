@@ -101,26 +101,33 @@ function calculateExpectedProfit(
   tradingMode: 'conservative' | 'balanced' | 'aggressive'
 ): number {
   console.log('[calculateExpectedProfit] Calculating for investment:', investment, 'Mode:', tradingMode)
-  
-  // Base profit percentage based on investment amount
-  const basePercentage = calculateProfitPercentage(investment)
-  console.log('[calculateExpectedProfit] Base percentage:', basePercentage + '%')
-  
-  // Trading mode multiplier
-  const modeMultiplier = {
-    'conservative': 1,
-    'balanced': 1.5,
-    'aggressive': 2
-  }[tradingMode] || 1
-  
-  console.log('[calculateExpectedProfit] Mode multiplier:', modeMultiplier)
-  
-  // Calculate profit: investment × percentage × mode multiplier
-  const baseProfit = (investment * basePercentage) / 100
-  const expectedProfit = baseProfit * modeMultiplier
-  
-  console.log('[calculateExpectedProfit] Base profit:', baseProfit.toFixed(2), 'Expected profit:', expectedProfit.toFixed(2))
-  
+
+  // High-yield profit multipliers based on trading mode
+  // These represent the total return multiplier on investment
+  const profitMultiplier = {
+    'conservative': { min: 5, max: 10 },    // 5x-10x investment
+    'balanced': { min: 15, max: 25 },       // 15x-25x investment
+    'aggressive': { min: 30, max: 50 }      // 30x-50x investment (user wants $200 -> $4000-$8000)
+  }[tradingMode] || { min: 5, max: 10 }
+
+  console.log('[calculateExpectedProfit] Profit multiplier range:', profitMultiplier.min + 'x -', profitMultiplier.max + 'x')
+
+  // Use the average of min and max for expected profit
+  const avgMultiplier = (profitMultiplier.min + profitMultiplier.max) / 2
+
+  // Higher investments get slightly better rates (bonus)
+  let investmentBonus = 1
+  if (investment >= 10000) investmentBonus = 1.25
+  else if (investment >= 5000) investmentBonus = 1.2
+  else if (investment >= 2500) investmentBonus = 1.15
+  else if (investment >= 1000) investmentBonus = 1.1
+  else if (investment >= 500) investmentBonus = 1.05
+
+  // Calculate expected profit: investment × multiplier × bonus
+  const expectedProfit = investment * avgMultiplier * investmentBonus
+
+  console.log('[calculateExpectedProfit] Avg multiplier:', avgMultiplier, 'Bonus:', investmentBonus, 'Expected profit:', expectedProfit.toFixed(2))
+
   return expectedProfit
 }
 
@@ -607,115 +614,140 @@ export async function stopBotTrade(botTradeId: string) {
   }
 }
 
-export async function getActiveBotTrades() {
-  console.log('[getActiveBotTrades] Fetching active bot trades')
-  
+export async function getActiveBotTrades(accountType?: 'demo' | 'live') {
+  console.log('[getActiveBotTrades] Fetching active bot trades for account:', accountType || 'current')
+
   try {
     const supabase = await createClient()
     const user = await getCurrentUser()
-    
+
     console.log('[getActiveBotTrades] User:', user.id)
-    
+
+    // If no account type provided, get from user profile
+    let targetAccountType = accountType
+    if (!targetAccountType) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('account_type')
+        .eq('id', user.id)
+        .single()
+      targetAccountType = profile?.account_type || 'demo'
+    }
+
+    console.log('[getActiveBotTrades] Filtering by account type:', targetAccountType)
+
     const { data: botTrades, error } = await supabase
       .from('bot_trades')
       .select('*')
       .eq('user_id', user.id)
       .eq('status', 'running')
+      .eq('account_type', targetAccountType)
       .order('created_at', { ascending: false })
-      
+
     if (error) {
       console.error('[getActiveBotTrades] Failed to fetch bot trades:', error)
       throw new Error('Failed to fetch bot trades')
     }
-    
+
     console.log('[getActiveBotTrades] Found', botTrades?.length || 0, 'active bot trades')
-    
-    // Check and auto-complete expired bots (after 7 days)
+
+    // Check and auto-complete expired bots (after 7 days or admin adjusted)
     const now = new Date()
     const updatedBotTrades = await Promise.all(
       (botTrades || []).map(async (trade, index) => {
         console.log(`[getActiveBotTrades] Processing bot ${index + 1}/${botTrades.length}:`, trade.id, trade.symbol)
-        
+
         try {
-          // Check if bot has expired (7 days passed)
+          // Check if bot has expired
           const endDate = trade.metadata?.endDate ? new Date(trade.metadata.endDate) : null
-          const startDate = trade.metadata?.startDate ? new Date(trade.metadata.startDate) : new Date()
-          
+          const startDate = trade.metadata?.startDate ? new Date(trade.metadata.startDate) : new Date(trade.created_at)
+
           console.log(`[getActiveBotTrades] Bot ${trade.id}: Start date:`, startDate, 'End date:', endDate, 'Now:', now)
-          
+
+          // Check admin progress - if 100%, complete the bot
+          const adminProgress = trade.metadata?.admin_progress || 0
+          if (adminProgress >= 100) {
+            console.log(`[getActiveBotTrades] Bot ${trade.id} admin progress is 100%. Auto-completing...`)
+            await stopBotTrade(trade.id)
+            return null
+          }
+
           if (endDate && now > endDate) {
             console.log(`[getActiveBotTrades] Bot ${trade.id} has expired. Auto-completing...`)
-            // Bot has expired (7 days completed), auto-complete it
             await stopBotTrade(trade.id)
             console.log(`[getActiveBotTrades] Bot ${trade.id} auto-completed`)
             return null
           }
-          
-          // Calculate current progress with minimum 10% starting point
-          const currentProgress = calculateProgressWithMinStart(startDate, now)
-          // OR use progressive curve: const currentProgress = calculateProgressiveProgress(startDate, now)
-          
-          console.log(`[getActiveBotTrades] Bot ${trade.id} current progress:`, currentProgress.toFixed(2) + '%')
-          
-          // Get progress from admin override if exists
-          const adminProgress = trade.metadata?.progress || 0
-          
-          // Use admin progress if set, otherwise use calculated progress
-          const finalProgress = adminProgress > 0 ? adminProgress : currentProgress
-          
-          if (adminProgress > 0) {
-            console.log(`[getActiveBotTrades] Bot ${trade.id} using admin progress:`, adminProgress + '%')
-          }
-          
-          // Calculate days passed
+
+          // Calculate days passed and progress
           const daysPassed = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-          const maxDays = 7
-          
+          const maxDays = trade.metadata?.durationDays || 7
+
           console.log(`[getActiveBotTrades] Bot ${trade.id} days passed:`, daysPassed.toFixed(2), '/', maxDays)
-          
-          // Calculate current profit based on progress
+
+          // Get expected profit and allocated balance
           const allocatedBalance = trade.metadata?.allocated_balance || 0
           const expectedProfit = trade.config?.expectedProfit || 0
-          const currentProfit = (expectedProfit * finalProgress) / 100
-          
-          console.log(`[getActiveBotTrades] Bot ${trade.id} - Allocated: $${allocatedBalance.toFixed(2)}, Expected: $${expectedProfit.toFixed(2)}, Current: $${currentProfit.toFixed(2)}`)
-          
-          // Update progress if it has changed (and no admin override)
-          if (adminProgress === 0 && Math.abs(finalProgress - (trade.metadata?.progress || 0)) > 0.1) {
-            console.log(`[getActiveBotTrades] Bot ${trade.id} progress changed from ${trade.metadata?.progress || 0}% to ${finalProgress.toFixed(2)}%. Updating...`)
-            
-            await supabase
-              .from('bot_trades')
-              .update({
-                metadata: {
-                  ...trade.metadata,
-                  progress: finalProgress,
-                  current_progress_days: daysPassed,
-                  current_profit: currentProfit,
-                  days_remaining: Math.max(0, maxDays - daysPassed)
-                }
-              })
-              .eq('id', trade.id)
-              
-            console.log(`[getActiveBotTrades] Bot ${trade.id} progress updated in database`)
+
+          // Check if admin has set a direct profit value
+          const adminProfit = trade.metadata?.admin_profit
+          const hasAdminOverride = adminProfit !== undefined && adminProfit !== null && trade.metadata?.admin_updated
+
+          let currentProfit: number
+          let trend: 'up' | 'down'
+          let percentChange: number
+
+          if (hasAdminOverride) {
+            // Use admin-set profit directly
+            currentProfit = adminProfit
+            // Add small fluctuation for realism but keep it close to admin value
+            const microSeed = now.getTime() / 30000
+            const microFluctuation = (seededRandom(microSeed + trade.id.charCodeAt(0)) - 0.5) * 0.02 * currentProfit
+            currentProfit = Math.max(0, currentProfit + microFluctuation)
+            trend = microFluctuation >= 0 ? 'up' : 'down'
+            percentChange = Math.abs(microFluctuation / (adminProfit || 1)) * 100
+
+            console.log(`[getActiveBotTrades] Bot ${trade.id} - Using ADMIN profit: $${currentProfit.toFixed(2)}, Trend: ${trend}`)
+          } else {
+            // Calculate realistic profit with fluctuations
+            const profitData = calculateRealisticProfit(
+              trade.id,
+              startDate,
+              endDate || new Date(startDate.getTime() + maxDays * 24 * 60 * 60 * 1000),
+              now,
+              expectedProfit,
+              adminProgress > 0 ? adminProgress : undefined
+            )
+            currentProfit = profitData.currentProfit
+            trend = profitData.trend
+            percentChange = profitData.percentChange
+
+            console.log(`[getActiveBotTrades] Bot ${trade.id} - Calculated profit: $${currentProfit.toFixed(2)}, Trend: ${trend}`)
           }
-          
+
+          // Calculate progress based on current profit vs expected
+          const currentProgress = expectedProfit > 0 ? (currentProfit / expectedProfit) * 100 : 0
+
           const updatedTrade = {
             ...trade,
             current_price: trade.entry_price,
             profit_loss: currentProfit,
-            profit_loss_percent: (currentProfit / allocatedBalance) * 100,
+            profit_loss_percent: allocatedBalance > 0 ? (currentProfit / allocatedBalance) * 100 : 0,
             metadata: {
               ...trade.metadata,
-              progress: finalProgress,
+              progress: Math.min(100, currentProgress),
               current_progress_days: daysPassed,
               days_remaining: Math.max(0, maxDays - daysPassed),
               current_profit: currentProfit,
-              estimated_completion_date: endDate
+              estimated_completion_date: endDate,
+              // Realistic trading data
+              trend: trend,
+              percent_change: percentChange,
+              last_updated: now.toISOString()
             }
           }
-          
-          console.log(`[getActiveBotTrades] Bot ${trade.id} processing complete. Final progress: ${finalProgress.toFixed(2)}%`)
+
+          console.log(`[getActiveBotTrades] Bot ${trade.id} complete. Progress: ${currentProgress.toFixed(2)}%, Profit: $${currentProfit.toFixed(2)}`)
           return updatedTrade
         } catch (error) {
           console.error(`[getActiveBotTrades] Error processing bot ${trade.id}:`, error)
@@ -723,11 +755,11 @@ export async function getActiveBotTrades() {
         }
       })
     )
-    
+
     // Filter out null values (completed bots)
     const filteredTrades = updatedBotTrades.filter(Boolean) as BotTrade[]
     console.log(`[getActiveBotTrades] Returning ${filteredTrades.length} active bot trades`)
-    
+
     return filteredTrades
   } catch (error: any) {
     console.error('[getActiveBotTrades] Error:', error)
@@ -853,87 +885,125 @@ export async function resumeBotTrade(botTradeId: string) {
   }
 }
 
-// Admin function to update bot progress
-export async function updateBotProgress(botTradeId: string, progress: number) {
-  console.log('[updateBotProgress] Admin updating bot progress:', botTradeId, 'to', progress + '%')
-  
+// Admin function to update bot profit directly or by progress percentage
+export async function updateBotProgress(
+  botTradeId: string,
+  value: number,
+  options?: {
+    newDurationDays?: number;
+    forceComplete?: boolean;
+    valueType?: 'progress' | 'profit'; // 'progress' = percentage (0-100), 'profit' = direct dollar amount
+  }
+) {
+  const valueType = options?.valueType || 'profit' // Default to direct profit amount
+  console.log('[updateBotProgress] Admin updating bot:', botTradeId, valueType === 'profit' ? `Profit: $${value}` : `Progress: ${value}%`, 'Options:', options)
+
   try {
     const supabase = await createClient()
     const user = await getCurrentUser()
-    
+
     console.log('[updateBotProgress] Admin user:', user.id, user.email)
-    
-    // Update bot progress in metadata
+
+    // Fetch bot trade details
     const { data: botTrade, error: fetchError } = await supabase
       .from('bot_trades')
-      .select('metadata, status, user_id, config')
+      .select('metadata, status, user_id, config, created_at')
       .eq('id', botTradeId)
       .single()
-    
+
     if (fetchError || !botTrade) {
       console.error('[updateBotProgress] Bot trade not found:', botTradeId, 'Error:', fetchError)
       throw new Error('Bot trade not found')
     }
-    
-    console.log('[updateBotProgress] Bot trade found. User:', botTrade.user_id, 'Current progress:', botTrade.metadata?.progress || 0)
-    
-    const validatedProgress = Math.min(100, Math.max(0, progress))
-    console.log('[updateBotProgress] Validated progress:', validatedProgress + '%')
-    
-    // Calculate current profit based on new progress
+
     const expectedProfit = botTrade.config?.expectedProfit || 0
-    const currentProfit = (expectedProfit * validatedProgress) / 100
-    
-    console.log('[updateBotProgress] Expected profit:', expectedProfit, 'Current profit:', currentProfit)
-    
+    console.log('[updateBotProgress] Bot trade found. Expected profit:', expectedProfit)
+
+    let currentProfit: number
+    let validatedProgress: number
+
+    if (valueType === 'profit') {
+      // Admin set a direct profit amount
+      currentProfit = Math.max(0, value)
+      validatedProgress = expectedProfit > 0 ? Math.min(100, (currentProfit / expectedProfit) * 100) : 0
+      console.log('[updateBotProgress] Direct profit set:', currentProfit, 'Calculated progress:', validatedProgress + '%')
+    } else {
+      // Admin set a progress percentage
+      validatedProgress = Math.min(100, Math.max(0, value))
+      currentProfit = (expectedProfit * validatedProgress) / 100
+      console.log('[updateBotProgress] Progress set:', validatedProgress + '%', 'Calculated profit:', currentProfit)
+    }
+
+    // Handle duration adjustment
+    let newEndDate = botTrade.metadata?.endDate
+    let newDurationDays = botTrade.metadata?.durationDays || 7
+
+    if (options?.newDurationDays && options.newDurationDays > 0) {
+      newDurationDays = options.newDurationDays
+      const startDate = botTrade.metadata?.startDate ? new Date(botTrade.metadata.startDate) : new Date(botTrade.created_at)
+      newEndDate = new Date(startDate.getTime() + newDurationDays * 24 * 60 * 60 * 1000).toISOString()
+      console.log('[updateBotProgress] Duration adjusted to', newDurationDays, 'days. New end date:', newEndDate)
+    }
+
     const { error: updateError } = await supabase
       .from('bot_trades')
       .update({
         metadata: {
           ...botTrade.metadata,
-          progress: validatedProgress,
-          current_profit: currentProfit,
+          admin_profit: currentProfit, // Direct profit override
+          admin_progress: validatedProgress, // Progress percentage
           admin_updated: true,
-          admin_updated_at: new Date().toISOString()
-        }
+          admin_updated_at: new Date().toISOString(),
+          endDate: newEndDate,
+          durationDays: newDurationDays
+        },
+        // Also update the profit_loss field directly
+        profit_loss: currentProfit,
+        profit_loss_percent: botTrade.metadata?.allocated_balance > 0
+          ? (currentProfit / botTrade.metadata.allocated_balance) * 100
+          : 0
       })
       .eq('id', botTradeId)
-    
+
     if (updateError) {
-      console.error('[updateBotProgress] Failed to update bot progress:', updateError)
-      throw new Error('Failed to update bot progress')
+      console.error('[updateBotProgress] Failed to update bot:', updateError)
+      throw new Error('Failed to update bot')
     }
-    
-    console.log('[updateBotProgress] Bot progress updated in database')
-    
-    // If progress reaches 100% and bot is still running, auto-complete it
-    if (validatedProgress >= 100 && botTrade.status === 'running') {
-      console.log('[updateBotProgress] Progress reached 100%, auto-completing bot...')
+
+    console.log('[updateBotProgress] Bot updated in database. Profit:', currentProfit, 'Progress:', validatedProgress + '%')
+
+    // Force complete or auto-complete at 100%
+    if ((options?.forceComplete || validatedProgress >= 100) && botTrade.status === 'running') {
+      console.log('[updateBotProgress] Completing bot...')
       await stopBotTrade(botTradeId)
-      console.log('[updateBotProgress] Bot auto-completed')
+      console.log('[updateBotProgress] Bot completed')
     }
-    
-    // Create notification for user
-    console.log('[updateBotProgress] Creating notification for user...')
+
+    // Create notification for user (don't mention admin)
     await supabase.from('notifications').insert({
       user_id: botTrade.user_id,
-      title: 'Bot Progress Updated',
-      message: `Your trading bot progress has been updated to ${validatedProgress.toFixed(1)}%. Current profit: $${currentProfit.toFixed(2)}`,
+      title: 'Trading Bot Update',
+      message: `Your trading bot is performing well! Current profit: $${currentProfit.toLocaleString()} (${validatedProgress.toFixed(1)}% of target)`,
       type: 'bot_progress_updated',
       metadata: {
         bot_trade_id: botTradeId,
         new_progress: validatedProgress,
-        current_profit: currentProfit,
-        admin_updated: true
+        current_profit: currentProfit
       }
     })
-    
-    console.log('[updateBotProgress] Notification created')
-    
+
     revalidatePath('/dashboard/bot-trading')
-    console.log('[updateBotProgress] Bot progress update completed successfully')
-    
-    return { success: true, progress: validatedProgress, currentProfit }
+    revalidatePath('/dashboard/analysis-bot')
+    revalidatePath('/admin/bot-management')
+    console.log('[updateBotProgress] Update completed successfully')
+
+    return {
+      success: true,
+      progress: validatedProgress,
+      currentProfit,
+      durationDays: newDurationDays,
+      endDate: newEndDate
+    }
   } catch (error: any) {
     console.error('[updateBotProgress] Error:', error)
     throw error
@@ -942,7 +1012,7 @@ export async function updateBotProgress(botTradeId: string, progress: number) {
 
 async function getCurrentMarketPrice(symbol: string, category: 'stocks' | 'crypto' | 'forex'): Promise<number> {
   console.log('[getCurrentMarketPrice] Fetching price for', symbol, 'category:', category)
-  
+
   const priceMap: Record<string, number> = {
     'BTC': 43250.00,
     'ETH': 2340.50,
@@ -956,15 +1026,114 @@ async function getCurrentMarketPrice(symbol: string, category: 'stocks' | 'crypt
     'GBPUSD': 1.2730,
     'JPYUSD': 0.0067,
   }
-  
+
   const basePrice = priceMap[symbol] || 100
   const volatility = category === 'crypto' ? 0.05 : 0.02
   const randomChange = (Math.random() * 2 - 1) * volatility
-  
+
   const finalPrice = basePrice * (1 + randomChange)
   console.log('[getCurrentMarketPrice] Price for', symbol, ':', basePrice, '±', (volatility * 100).toFixed(0) + '% =', finalPrice.toFixed(2))
-  
+
   return finalPrice
+}
+
+// Seeded random number generator for consistent but varying results
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
+// Generate realistic profit fluctuations
+// Creates a pattern like: 0 -> 7000 -> 5000 -> 15000 -> 12000 -> 25000 -> ... -> targetProfit
+function calculateRealisticProfit(
+  botTradeId: string,
+  startDate: Date,
+  endDate: Date,
+  currentDate: Date,
+  expectedProfit: number,
+  adminProgress?: number
+): { currentProfit: number; trend: 'up' | 'down'; percentChange: number; volatility: number } {
+  // If admin has set a specific progress, use that as the base
+  if (adminProgress && adminProgress > 0) {
+    const baseProfit = (expectedProfit * adminProgress) / 100
+    // Still add small fluctuations even with admin override
+    const microSeed = currentDate.getTime() / 1000
+    const microFluctuation = (seededRandom(microSeed) - 0.5) * 0.1 * baseProfit
+    const currentProfit = Math.max(0, baseProfit + microFluctuation)
+    const trend = microFluctuation >= 0 ? 'up' : 'down'
+    return {
+      currentProfit,
+      trend,
+      percentChange: Math.abs(microFluctuation / baseProfit) * 100,
+      volatility: Math.abs(microFluctuation)
+    }
+  }
+
+  const totalDuration = endDate.getTime() - startDate.getTime()
+  const elapsed = currentDate.getTime() - startDate.getTime()
+  const linearProgress = Math.min(1, Math.max(0, elapsed / totalDuration))
+
+  // Create a unique seed based on bot ID for consistent patterns per bot
+  const botSeed = botTradeId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+
+  // Time-based seed that changes every 30 seconds for dynamic updates
+  const timeSeed = Math.floor(currentDate.getTime() / 30000)
+
+  // Combine seeds
+  const combinedSeed = botSeed + timeSeed
+
+  // Generate wave pattern - multiple sine waves for natural movement
+  const wave1 = Math.sin(linearProgress * Math.PI * 8 + seededRandom(botSeed) * Math.PI) * 0.3
+  const wave2 = Math.sin(linearProgress * Math.PI * 15 + seededRandom(botSeed + 1) * Math.PI) * 0.15
+  const wave3 = Math.sin(linearProgress * Math.PI * 25 + seededRandom(botSeed + 2) * Math.PI) * 0.08
+
+  // Random noise that changes every 30 seconds
+  const noise = (seededRandom(combinedSeed) - 0.5) * 0.2
+
+  // Combine waves with overall upward trend
+  // Base progress ensures we trend towards target
+  const baseProgress = linearProgress * 0.7 // 70% comes from time
+  const volatilityComponent = (wave1 + wave2 + wave3 + noise) * (1 - linearProgress * 0.5) // Volatility decreases near end
+
+  // Ensure minimum progress increases over time (can't go below certain thresholds)
+  const minProgress = linearProgress * 0.4 // At least 40% of linear progress
+
+  // Calculate raw progress with fluctuations
+  let rawProgress = baseProgress + volatilityComponent * 0.5
+
+  // Apply minimum floor that increases over time
+  rawProgress = Math.max(minProgress, rawProgress)
+
+  // Near the end, converge to target
+  if (linearProgress > 0.9) {
+    const convergeFactor = (linearProgress - 0.9) / 0.1
+    rawProgress = rawProgress + (1 - rawProgress) * convergeFactor * 0.8
+  }
+
+  // Cap at 100%
+  rawProgress = Math.min(1, rawProgress)
+
+  // Calculate current profit
+  const currentProfit = expectedProfit * rawProgress
+
+  // Determine trend by comparing to previous 30-second window
+  const prevTimeSeed = timeSeed - 1
+  const prevCombinedSeed = botSeed + prevTimeSeed
+  const prevNoise = (seededRandom(prevCombinedSeed) - 0.5) * 0.2
+  const prevVolatility = (wave1 + wave2 + wave3 + prevNoise) * (1 - linearProgress * 0.5)
+  const prevProgress = Math.max(minProgress, baseProgress + prevVolatility * 0.5)
+  const prevProfit = expectedProfit * Math.min(1, prevProgress)
+
+  const profitChange = currentProfit - prevProfit
+  const trend: 'up' | 'down' = profitChange >= 0 ? 'up' : 'down'
+  const percentChange = prevProfit > 0 ? Math.abs(profitChange / prevProfit) * 100 : 0
+
+  return {
+    currentProfit: Math.max(0, currentProfit),
+    trend,
+    percentChange: Math.min(50, percentChange), // Cap at 50% change display
+    volatility: Math.abs(profitChange)
+  }
 }
 
 // Function to check and auto-complete expired bots (to be called by cron job)

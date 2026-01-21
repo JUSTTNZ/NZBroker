@@ -1,5 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { BookOpen, Video, BarChart2, Users } from "lucide-react"
 
 export const metadata = {
   title: "Education - AstralisX Vault",
@@ -25,6 +26,37 @@ export default function EducationPage() {
       title: "Professional Trading Systems",
       description: "Develop sophisticated trading algorithms and strategies",
       lessons: 32,
+    },
+  ]
+
+  const resources = [
+    {
+      title: "Trading Guides",
+      description: "Comprehensive guides on trading strategies, risk management, and market analysis",
+      icon: BookOpen,
+      iconColor: "text-blue-500",
+      bgColor: "bg-blue-500/20",
+    },
+    {
+      title: "Video Tutorials",
+      description: "Step-by-step video lessons covering all aspects of trading and platform features",
+      icon: Video,
+      iconColor: "text-red-500",
+      bgColor: "bg-red-500/20",
+    },
+    {
+      title: "Webinars",
+      description: "Live webinars with professional traders sharing insights and market analysis",
+      icon: BarChart2,
+      iconColor: "text-purple-500",
+      bgColor: "bg-purple-500/20",
+    },
+    {
+      title: "Community",
+      description: "Connect with other traders, share ideas, and discuss market movements",
+      icon: Users,
+      iconColor: "text-green-500",
+      bgColor: "bg-green-500/20",
     },
   ]
 
@@ -71,30 +103,25 @@ export default function EducationPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
         <h2 className="text-3xl font-bold mb-8">Learning Resources</h2>
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="p-6 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-            <h3 className="text-xl font-semibold mb-3">📚 Trading Guides</h3>
-            <p className="text-muted-foreground">
-              Comprehensive guides on trading strategies, risk management, and market analysis
-            </p>
-          </div>
-          <div className="p-6 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-            <h3 className="text-xl font-semibold mb-3">🎥 Video Tutorials</h3>
-            <p className="text-muted-foreground">
-              Step-by-step video lessons covering all aspects of trading and platform features
-            </p>
-          </div>
-          <div className="p-6 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-            <h3 className="text-xl font-semibold mb-3">📊 Webinars</h3>
-            <p className="text-muted-foreground">
-              Live webinars with professional traders sharing insights and market analysis
-            </p>
-          </div>
-          <div className="p-6 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-            <h3 className="text-xl font-semibold mb-3">💬 Community</h3>
-            <p className="text-muted-foreground">
-              Connect with other traders, share ideas, and discuss market movements
-            </p>
-          </div>
+          {resources.map((resource) => {
+            const IconComponent = resource.icon
+            return (
+              <div
+                key={resource.title}
+                className="p-6 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm hover:border-primary/50 hover:bg-card/80 transition-all duration-300"
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-12 h-12 rounded-lg ${resource.bgColor} flex items-center justify-center shrink-0`}>
+                    <IconComponent className={`w-6 h-6 ${resource.iconColor}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">{resource.title}</h3>
+                    <p className="text-muted-foreground">{resource.description}</p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </section>
 

@@ -1,6 +1,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { MapPin, Clock } from "lucide-react"
 
 export const metadata = {
   title: "Contact Us - AstralisX Vault",
@@ -71,7 +72,12 @@ export default function ContactPage() {
           {/* Contact Info */}
           <div className="space-y-8">
             <div className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-              <h3 className="text-xl font-semibold mb-4">📍 Office Location</h3>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold">Office Location</h3>
+              </div>
               <p className="text-muted-foreground">
                 AstralisX Vault
                 <br />
@@ -84,13 +90,12 @@ export default function ContactPage() {
             </div>
 
             <div className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-              <h3 className="text-xl font-semibold mb-4">📞 Contact Information</h3>
-              <p className="text-muted-foreground mb-2">Email: support@astralisx.com</p>
-              <p className="text-muted-foreground">Phone: +1 (555) 123-4567</p>
-            </div>
-
-            <div className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
-              <h3 className="text-xl font-semibold mb-4">⏰ Support Hours</h3>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-secondary" />
+                </div>
+                <h3 className="text-xl font-semibold">Support Hours</h3>
+              </div>
               <p className="text-muted-foreground mb-2">Monday - Friday: 8:00 AM - 8:00 PM UTC</p>
               <p className="text-muted-foreground">Saturday - Sunday: 10:00 AM - 6:00 PM UTC</p>
             </div>

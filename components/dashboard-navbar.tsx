@@ -2,18 +2,19 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Bell, ChevronDown, Moon, Sun, User, LogOut } from "lucide-react"
+import { Bell, ChevronDown, Moon, Sun, User, LogOut, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 
 export function DashboardNavbar() {
-  const { 
-    user, 
-    userProfile, 
-    currentWallet, 
-    activePlan, 
+  const {
+    user,
+    userProfile,
+    currentWallet,
+    activePlan,
     switchAccountType,
-    signOut 
+    signOut,
+    refreshAllData
   } = useAuth()
   
   const [notificationCount, setNotificationCount] = useState(0)
@@ -85,14 +86,16 @@ export function DashboardNavbar() {
   }
 
   const handleAccountSwitch = async (accountType: "demo" | "live") => {
-    if (!userProfile || userProfile.account_type === accountType) return
-    
+    // Don't switch if already on that account type or if no profile
+    if (!userProfile || userProfile.account_type === accountType || isSwitchingAccount) return
+
     setIsSwitchingAccount(true)
     try {
       await switchAccountType(accountType)
-      console.log("✅ Account switched to:", accountType)
+      // Refresh all data to ensure wallet balances are updated
+      await refreshAllData()
     } catch (error) {
-      console.error("❌ Failed to switch account:", error)
+      console.error("Failed to switch account:", error)
     } finally {
       setIsSwitchingAccount(false)
     }
@@ -162,16 +165,36 @@ export function DashboardNavbar() {
         {/* Center - Account Switcher */}
         <div className="flex-1 md:flex-none hidden md:block">
           <div className="flex items-center justify-center">
-            <select
-              value={userProfile?.account_type || "demo"}
-              onChange={(e) => handleAccountSwitch(e.target.value as "demo" | "live")}
-              disabled={isSwitchingAccount || !userProfile}
-              className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground hover:border-primary transition-all cursor-pointer min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Select account type"
-            >
-              <option value="demo">Demo Account</option>
-              <option value="live">Live Account</option>
-            </select>
+            <div className="flex items-center bg-muted rounded-lg p-1">
+              <button
+                onClick={() => handleAccountSwitch("demo")}
+                disabled={isSwitchingAccount || !userProfile}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  userProfile?.account_type === "demo"
+                    ? "bg-yellow-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {isSwitchingAccount && userProfile?.account_type !== "demo" ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : null}
+                Demo
+              </button>
+              <button
+                onClick={() => handleAccountSwitch("live")}
+                disabled={isSwitchingAccount || !userProfile}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  userProfile?.account_type === "live"
+                    ? "bg-green-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {isSwitchingAccount && userProfile?.account_type !== "live" ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : null}
+                Live
+              </button>
+            </div>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { Target, Handshake, Lock, Zap, Globe, Wallet, Smartphone } from "lucide-react"
 
 export const metadata = {
   title: "About AstralisX Vault - Global Trading Platform",
@@ -7,6 +8,53 @@ export const metadata = {
 }
 
 export default function AboutPage() {
+  const values = [
+    {
+      title: "Excellence",
+      description: "We strive for excellence in every aspect of our platform and service",
+      icon: Target,
+      iconColor: "text-primary",
+      bgColor: "bg-primary/20",
+    },
+    {
+      title: "Transparency",
+      description: "We believe in transparent operations and clear communication",
+      icon: Handshake,
+      iconColor: "text-secondary",
+      bgColor: "bg-secondary/20",
+    },
+    {
+      title: "Security",
+      description: "Your security and privacy are our top priorities",
+      icon: Lock,
+      iconColor: "text-accent",
+      bgColor: "bg-accent/20",
+    },
+  ]
+
+  const features = [
+    {
+      title: "Ultra-Fast Execution",
+      description: "Execute trades in milliseconds with our advanced infrastructure",
+      icon: Zap,
+    },
+    {
+      title: "Global Reach",
+      description: "Access 500+ trading instruments across all asset classes",
+      icon: Globe,
+    },
+    {
+      title: "Zero Commission",
+      description: "Trade with zero hidden fees and competitive spreads",
+      icon: Wallet,
+    },
+    {
+      title: "Multi-Platform",
+      description: "Trade on web, desktop, iOS, or Android anytime, anywhere",
+      icon: Smartphone,
+    },
+  ]
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Header />
@@ -42,29 +90,21 @@ export default function AboutPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
         <h2 className="text-3xl font-bold mb-8 text-center">Our Core Values</h2>
         <div className="grid md:grid-cols-3 gap-8">
-          <div className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm text-center">
-            <div className="w-16 h-16 rounded-lg bg-primary/20 flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🎯</span>
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Excellence</h3>
-            <p className="text-muted-foreground">
-              We strive for excellence in every aspect of our platform and service
-            </p>
-          </div>
-          <div className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm text-center">
-            <div className="w-16 h-16 rounded-lg bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🤝</span>
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Transparency</h3>
-            <p className="text-muted-foreground">We believe in transparent operations and clear communication</p>
-          </div>
-          <div className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm text-center">
-            <div className="w-16 h-16 rounded-lg bg-accent/20 flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🔒</span>
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Security</h3>
-            <p className="text-muted-foreground">Your security and privacy are our top priorities</p>
-          </div>
+          {values.map((value) => {
+            const IconComponent = value.icon
+            return (
+              <div
+                key={value.title}
+                className="p-8 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm text-center hover:border-primary/50 hover:bg-card/80 transition-all duration-300"
+              >
+                <div className={`w-16 h-16 rounded-lg ${value.bgColor} flex items-center justify-center mx-auto mb-4`}>
+                  <IconComponent className={`w-8 h-8 ${value.iconColor}`} />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">{value.title}</h3>
+                <p className="text-muted-foreground">{value.description}</p>
+              </div>
+            )
+          })}
         </div>
       </section>
 
@@ -72,34 +112,20 @@ export default function AboutPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
         <h2 className="text-3xl font-bold mb-8 text-center">Why Choose AstralisX Vault?</h2>
         <div className="grid md:grid-cols-2 gap-8">
-          <div className="flex gap-4">
-            <span className="text-2xl">⚡</span>
-            <div>
-              <h3 className="font-semibold mb-2">Ultra-Fast Execution</h3>
-              <p className="text-muted-foreground">Execute trades in milliseconds with our advanced infrastructure</p>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <span className="text-2xl">🌍</span>
-            <div>
-              <h3 className="font-semibold mb-2">Global Reach</h3>
-              <p className="text-muted-foreground">Access 500+ trading instruments across all asset classes</p>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <span className="text-2xl">💰</span>
-            <div>
-              <h3 className="font-semibold mb-2">Zero Commission</h3>
-              <p className="text-muted-foreground">Trade with zero hidden fees and competitive spreads</p>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <span className="text-2xl">📱</span>
-            <div>
-              <h3 className="font-semibold mb-2">Multi-Platform</h3>
-              <p className="text-muted-foreground">Trade on web, desktop, iOS, or Android anytime, anywhere</p>
-            </div>
-          </div>
+          {features.map((feature) => {
+            const IconComponent = feature.icon
+            return (
+              <div key={feature.title} className="flex gap-4">
+                <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                  <IconComponent className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">{feature.title}</h3>
+                  <p className="text-muted-foreground">{feature.description}</p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </section>
 
