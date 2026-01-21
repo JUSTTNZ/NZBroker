@@ -151,7 +151,7 @@ export function DashboardSidebar() {
         {/* Header with collapse toggle */}
         <div className="p-3 border-b border-sidebar-border flex items-center justify-between">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-sidebar-primary truncate">AstralisX</h2>
+            <h2 className="text-lg font-bold text-sidebar-primary truncate">Barcrest</h2>
             <p className="text-xs text-sidebar-foreground/60 truncate">Vault</p>
           </div>
           
