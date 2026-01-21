@@ -11,7 +11,7 @@ export function CTAStrip() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
         <h2 className="text-4xl md:text-5xl font-bold text-balance">Ready to Start Trading?</h2>
-        <p className="text-lg text-muted-foreground">Join thousands of traders already profiting on AstralisX Vault</p>
+        <p className="text-lg text-muted-foreground">Join thousands of traders already profiting on Barcrest Vault</p>
 
         <Button
           size="lg"

@@ -11,7 +11,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AstralisX Vault - Global Trading Platform",
+  title: "Barcrest Vault - Global Trading Platform",
   description: "Trade global markets with confidence. Forex, Crypto, Indices, Commodities, and Stocks",
   generator: "v0.app",
   themeColor: "#0B0B12",

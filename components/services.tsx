@@ -15,7 +15,7 @@ export function Services() {
             </span>
           </div>
           <div className="space-y-4">
-            <h2 className="text-4xl md:text-5xl font-bold">Start Trading with AstralisX Vault</h2>
+            <h2 className="text-4xl md:text-5xl font-bold">Start Trading with Barcrest Vault</h2>
             <p className="text-muted-foreground text-lg">Everything you need in one platform</p>
           </div>
         </div>
