@@ -50,7 +50,7 @@ export default function RegisterPage() {
       }
 
       await signUp(email, password, fullName)
-      router.push("/login")
+      router.push("/register/verify")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed. Please try again.")
       console.log("Registration error:", err)

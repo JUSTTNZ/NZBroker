@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Circle, Upload, User, FileText, Home, Shield, AlertCircle, Clock, XCircle } from "lucide-react"
+import { CheckCircle, Circle, Upload, User, FileText, Home, Shield, AlertCircle, Clock, XCircle, BadgeCheck } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -290,31 +290,124 @@ export default function KycPage() {
           <p className="text-muted-foreground">Your account verification status</p>
         </div>
 
-        <Card className="p-8 bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/30">
-          <div className="text-center">
-            <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-10 h-10 text-green-500" />
+        {/* Verified Badge Card */}
+        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 p-1">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50"></div>
+          <div className="relative bg-card/95 backdrop-blur rounded-lg p-8">
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              {/* Verified Badge */}
+              <div className="relative">
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 p-1 shadow-2xl shadow-green-500/30">
+                  <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
+                    <div className="text-center">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-1" />
+                      <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Verified</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Animated ring */}
+                <div className="absolute inset-0 rounded-full border-4 border-green-400/30 animate-ping"></div>
+              </div>
+
+              {/* Verification Info */}
+              <div className="flex-1 text-center md:text-left">
+                <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
+                  <Shield className="w-5 h-5 text-green-500" />
+                  <span className="text-sm font-semibold text-green-600 uppercase tracking-wider">Identity Verified</span>
+                </div>
+                <h2 className="text-3xl font-bold mb-2">{existingKYC.full_name}</h2>
+                <p className="text-muted-foreground mb-4">
+                  Your identity has been successfully verified. You have full access to all trading features.
+                </p>
+                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                  <span className="px-4 py-2 bg-green-500/10 text-green-600 rounded-full text-sm font-medium border border-green-500/20">
+                    <CheckCircle className="w-4 h-4 inline mr-1" />
+                    Unlimited Withdrawals
+                  </span>
+                  <span className="px-4 py-2 bg-green-500/10 text-green-600 rounded-full text-sm font-medium border border-green-500/20">
+                    <CheckCircle className="w-4 h-4 inline mr-1" />
+                    Full Trading Access
+                  </span>
+                  <span className="px-4 py-2 bg-green-500/10 text-green-600 rounded-full text-sm font-medium border border-green-500/20">
+                    <CheckCircle className="w-4 h-4 inline mr-1" />
+                    Priority Support
+                  </span>
+                </div>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-green-600 mb-2">Verification Complete</h2>
-            <p className="text-muted-foreground mb-6">
-              Your identity has been verified. You now have full access to all trading features.
+          </div>
+        </Card>
+
+        {/* Verification Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-6 bg-card/50 border-border/40 hover:border-green-500/30 transition-colors">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                <User className="w-5 h-5 text-green-500" />
+              </div>
+              <span className="text-sm text-muted-foreground">Full Name</span>
+            </div>
+            <p className="font-semibold text-lg">{existingKYC.full_name}</p>
+          </Card>
+
+          <Card className="p-6 bg-card/50 border-border/40 hover:border-green-500/30 transition-colors">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-blue-500" />
+              </div>
+              <span className="text-sm text-muted-foreground">Document Type</span>
+            </div>
+            <p className="font-semibold text-lg capitalize">{existingKYC.document_type?.replace("_", " ")}</p>
+          </Card>
+
+          <Card className="p-6 bg-card/50 border-border/40 hover:border-green-500/30 transition-colors">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                <Home className="w-5 h-5 text-purple-500" />
+              </div>
+              <span className="text-sm text-muted-foreground">Country</span>
+            </div>
+            <p className="font-semibold text-lg">{existingKYC.country}</p>
+          </Card>
+
+          <Card className="p-6 bg-card/50 border-border/40 hover:border-green-500/30 transition-colors">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-500" />
+              </div>
+              <span className="text-sm text-muted-foreground">Verified On</span>
+            </div>
+            <p className="font-semibold text-lg">
+              {existingKYC.submitted_at ? new Date(existingKYC.submitted_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              }) : "N/A"}
             </p>
-            <div className="grid grid-cols-2 gap-4 max-w-md mx-auto text-left">
-              <div className="p-4 bg-background/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Verified Name</p>
-                <p className="font-medium">{existingKYC.full_name}</p>
-              </div>
-              <div className="p-4 bg-background/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Document Type</p>
-                <p className="font-medium capitalize">{existingKYC.document_type?.replace("_", " ")}</p>
-              </div>
-              <div className="p-4 bg-background/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Country</p>
-                <p className="font-medium">{existingKYC.country}</p>
-              </div>
-              <div className="p-4 bg-background/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Verified On</p>
-                <p className="font-medium">{existingKYC.submitted_at ? new Date(existingKYC.submitted_at).toLocaleDateString() : "N/A"}</p>
+          </Card>
+        </div>
+
+        {/* Additional Info */}
+        <Card className="p-6 bg-gradient-to-r from-green-500/5 to-emerald-500/5 border-green-500/20">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-6 h-6 text-green-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Your Account is Fully Verified</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                You&apos;ve completed all verification requirements. Your account now has access to all platform features including unlimited withdrawals, higher trading limits, and priority customer support.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded text-xs font-medium">
+                  Document #{existingKYC.document_number?.slice(0, 4)}***
+                </span>
+                <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded text-xs font-medium">
+                  {existingKYC.nationality}
+                </span>
+                <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded text-xs font-medium">
+                  {existingKYC.city}, {existingKYC.country}
+                </span>
               </div>
             </div>
           </div>
@@ -332,52 +425,121 @@ export default function KycPage() {
           <p className="text-muted-foreground">Your verification is being processed</p>
         </div>
 
-        <Card className="p-8 bg-card/50 border-border/40">
-          <div className="flex items-center justify-between mb-6">
+        {/* Status Banner */}
+        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-amber-500 via-orange-500 to-yellow-500 p-1">
+          <div className="relative bg-card/95 backdrop-blur rounded-lg p-8">
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              {/* Pending Badge */}
+              <div className="relative">
+                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 p-1 shadow-xl shadow-amber-500/20">
+                  <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
+                    <div className="text-center">
+                      <Clock className="w-10 h-10 text-amber-500 mx-auto mb-1 animate-pulse" />
+                      <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Pending</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Info */}
+              <div className="flex-1 text-center md:text-left">
+                <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                  <span className="text-sm font-semibold text-amber-600 uppercase tracking-wider">
+                    {existingKYC.status === "under_review" ? "Under Review" : "Pending Review"}
+                  </span>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Verification In Progress</h2>
+                <p className="text-muted-foreground mb-4">
+                  Your documents are being reviewed by our verification team. This usually takes 24-48 hours.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Submitted on {existingKYC.submitted_at ? new Date(existingKYC.submitted_at).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Progress Steps */}
+        <Card className="p-6 bg-card/50 border-border/40">
+          <h3 className="font-semibold text-lg mb-6">Verification Progress</h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 p-4 bg-green-500/5 rounded-lg border border-green-500/20">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Personal Information</p>
+                <p className="text-sm text-muted-foreground">Your details have been submitted</p>
+              </div>
+              <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded-full text-xs font-medium">Complete</span>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-green-500/5 rounded-lg border border-green-500/20">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Document Verification</p>
+                <p className="text-sm text-muted-foreground">ID document uploaded successfully</p>
+              </div>
+              <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded-full text-xs font-medium">Complete</span>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-green-500/5 rounded-lg border border-green-500/20">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Address Verification</p>
+                <p className="text-sm text-muted-foreground">Proof of address uploaded</p>
+              </div>
+              <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded-full text-xs font-medium">Complete</span>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+              <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-white animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Admin Review</p>
+                <p className="text-sm text-muted-foreground">Our team is reviewing your submission</p>
+              </div>
+              <span className="px-3 py-1 bg-amber-500/10 text-amber-600 rounded-full text-xs font-medium animate-pulse">In Progress</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* What to Expect */}
+        <Card className="p-6 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 border-blue-500/20">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-6 h-6 text-blue-500" />
+            </div>
             <div>
-              <h3 className="text-xl font-semibold">Verification Status</h3>
-              <p className="text-sm text-muted-foreground">Submitted on {existingKYC.submitted_at ? new Date(existingKYC.submitted_at).toLocaleString() : "N/A"}</p>
+              <h3 className="font-semibold text-lg mb-2">What happens next?</h3>
+              <ul className="text-sm text-muted-foreground space-y-2">
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <span>Our verification team will review your documents within 24-48 hours</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <span>You&apos;ll receive a notification once your verification is complete</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <span>Once verified, all trading limits will be removed from your account</span>
+                </li>
+              </ul>
             </div>
-            {getStatusBadge(existingKYC.status || "pending")}
-          </div>
-
-          <div className="space-y-4 mb-8">
-            <div className="p-4 bg-background/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Personal Information</span>
-                </div>
-                <span className="text-sm text-green-500">Submitted</span>
-              </div>
-            </div>
-            <div className="p-4 bg-background/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Document Verification</span>
-                </div>
-                <span className="text-sm text-green-500">Submitted</span>
-              </div>
-            </div>
-            <div className="p-4 bg-background/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Address Verification</span>
-                </div>
-                <span className="text-sm text-green-500">Submitted</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <h4 className="font-medium text-blue-600 mb-2">What happens next?</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Our team will review your documents within 24-48 hours</li>
-              <li>• You'll receive a notification once verified</li>
-              <li>• Once verified, all trading limits will be removed</li>
-            </ul>
           </div>
         </Card>
       </div>

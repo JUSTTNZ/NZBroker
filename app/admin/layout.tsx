@@ -17,6 +17,7 @@ import {
   Home,
   BotIcon,
   FileCheck,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
@@ -31,6 +32,7 @@ const adminLinks = [
   { href: "/admin/updatebot", label: "Update Bot", icon: BotIcon },
   { href: "/admin/plan", label: "Plans", icon: CreditCard },
   { href: "/admin/withdrawals", label: "Withdrawals", icon: CreditCard },
+  { href: "/admin/messages", label: "User Messages", icon: AlertTriangle },
   { href: "/admin/support", label: "Customer Support", icon: MessageSquare },
   { href: "/admin/transactions", label: "Transactions", icon: DollarSign },
   { href: "/admin/settings", label: "Settings", icon: Settings },

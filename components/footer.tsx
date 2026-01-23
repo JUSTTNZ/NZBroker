@@ -14,7 +14,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <h3 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Barcrest Vault
+              Barcrest
             </h3>
             <p className="text-muted-foreground text-sm">
               Professional trading platform for global markets. Trade with confidence.
