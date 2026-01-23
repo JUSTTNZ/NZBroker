@@ -27,14 +27,22 @@ interface Withdrawal {
   created_at: string
 }
 
+interface AdminMessage {
+  message: string | null
+  created_at: string | null
+}
+
 export default function DashboardPage() {
   const { user, userProfile, currentWallet, wallets, userPlans, refreshAllData, switchAccountType } = useAuth()
   const router = useRouter()
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false)
   const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null)
+  const [adminMessage, setAdminMessage] = useState<AdminMessage | null>(null)
   const [activeBotTrades, setActiveBotTrades] = useState<any[]>([])
   const [loadingBots, setLoadingBots] = useState(false)
   const [expandedBots, setExpandedBots] = useState<Set<string>>(new Set())
+
+  const supportEmail = "support@barcrestcapital.com"
 
   // Calculate total profit (example - you should get this from transactions)
   const calculateTotalProfit = () => {
@@ -102,6 +110,36 @@ useEffect(() => {
   }
 
   fetchPendingWithdrawal()
+}, [user])
+
+// Fetch admin message
+useEffect(() => {
+  const fetchAdminMessage = async () => {
+    if (!user) return
+
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("admin_messages")
+        .select("message, created_at")
+        .eq("user_id", user.id)
+        .single()
+
+      if (data && data.message) {
+        setAdminMessage({
+          message: data.message,
+          created_at: data.created_at
+        })
+      } else {
+        setAdminMessage(null)
+      }
+    } catch (error) {
+      // No message found is not an error
+      setAdminMessage(null)
+    }
+  }
+
+  fetchAdminMessage()
 }, [user])
 
 // Fetch active bot trades for current account type
@@ -195,31 +233,64 @@ useEffect(() => {
           </div>
         </div>
       </div>
-      {pendingWithdrawal && (
-  <Card className="p-4 md:p-6 bg-red-500/10 border-red-500/30 animate-fade-in-up mb-6">
+      {/* Admin Danger Message */}
+{adminMessage && adminMessage.message && (
+  <Card className="p-4 md:p-6 bg-red-600/20 border-2 border-red-600/50 animate-fade-in-up mb-6 shadow-lg shadow-red-500/10">
     <div className="flex items-start gap-3">
-      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+      <div className="p-2 bg-red-600 rounded-full flex-shrink-0">
+        <AlertCircle className="w-5 h-5 text-white" />
+      </div>
       <div className="flex-1">
-        <h3 className="font-semibold text-red-500 mb-2">Payment Instructions Required</h3>
-        <p className="text-sm text-red-600 mb-3">
-          You have a pending withdrawal of <span className="font-bold">${pendingWithdrawal.amount.toLocaleString()}</span> that requires payment. 
+        <h3 className="font-bold text-red-700 dark:text-red-400 text-lg mb-2">Important Notice</h3>
+        <p className="text-sm text-red-800 dark:text-red-200 whitespace-pre-wrap mb-4 leading-relaxed">
+          {adminMessage.message}
+        </p>
+        <p className="text-sm text-red-800 dark:text-red-200">
+          Contact{" "}
+          <a
+            href={`mailto:${supportEmail}`}
+            className="underline font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 transition-colors"
+          >
+            Customer Support
+          </a>
+        </p>
+        {adminMessage.created_at && (
+          <p className="text-xs text-red-600/70 mt-3">
+            Posted: {new Date(adminMessage.created_at).toLocaleString()}
+          </p>
+        )}
+      </div>
+    </div>
+  </Card>
+)}
+
+{/* Withdrawal Payment Instructions */}
+{pendingWithdrawal && (
+  <Card className="p-4 md:p-6 bg-red-600/20 border-2 border-red-600/50 animate-fade-in-up mb-6 shadow-lg shadow-red-500/10">
+    <div className="flex items-start gap-3">
+      <div className="p-2 bg-red-600 rounded-full flex-shrink-0">
+        <AlertCircle className="w-5 h-5 text-white" />
+      </div>
+      <div className="flex-1">
+        <h3 className="font-bold text-red-700 dark:text-red-400 text-lg mb-2">Payment Instructions Required</h3>
+        <p className="text-sm text-red-800 dark:text-red-200 mb-3">
+          You have a pending withdrawal of <span className="font-bold text-red-900 dark:text-red-100">${pendingWithdrawal.amount.toLocaleString()}</span> that requires payment.
           Please follow the instructions below to complete your withdrawal:
         </p>
-        
-        <div className="bg-white/50 dark:bg-black/50 p-3 rounded border border-red-500/20">
-          <p className="text-sm font-medium text-red-500 mb-2">Payment Details:</p>
-          <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">
+
+        <div className="bg-white/70 dark:bg-black/50 p-4 rounded-lg border-2 border-red-500/30">
+          <p className="text-sm font-bold text-red-700 dark:text-red-400 mb-2">Payment Details:</p>
+          <p className="text-sm text-red-800 dark:text-red-200 whitespace-pre-wrap leading-relaxed">
             {pendingWithdrawal.payment_details}
           </p>
-          
+
           {pendingWithdrawal.admin_fee > 0 && (
-            <div className="mt-3 pt-3 border-t border-red-500/20">
-              <p className="text-sm font-medium text-red-500 mb-1">Payment Summary:</p>
+            <div className="mt-4 pt-4 border-t-2 border-red-500/30">
+              <p className="text-sm font-bold text-red-700 dark:text-red-400 mb-2">Payment Summary:</p>
               <div className="grid grid-cols-1 gap-2 text-sm">
-              
-                <div className="flex justify-between col-span-2 pt-1 border-t border-red-500/10">
-                  <span className="text-red-600 font-medium">Total to Pay:</span>
-                  <span className="font-bold text-lg text-red-700">
+                <div className="flex justify-between items-center bg-red-500/10 p-2 rounded">
+                  <span className="text-red-700 dark:text-red-300 font-semibold">Total to Pay:</span>
+                  <span className="font-bold text-xl text-red-800 dark:text-red-200">
                     ${pendingWithdrawal.admin_fee.toLocaleString()}
                   </span>
                 </div>
@@ -227,10 +298,22 @@ useEffect(() => {
             </div>
           )}
         </div>
-        
-        
-        <p className="text-xs text-red-500/80 mt-3">
-          ⚠️ Your withdrawal will be processed after we confirm your payment.
+
+        <div className="mt-4 flex items-start gap-2">
+          <span className="text-lg">⚠️</span>
+          <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+            Your withdrawal will be processed after we confirm your payment.
+          </p>
+        </div>
+
+        <p className="text-sm text-red-800 dark:text-red-200 mt-3">
+          Contact{" "}
+          <a
+            href={`mailto:${supportEmail}`}
+            className="underline font-bold text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 transition-colors"
+          >
+            Customer Support
+          </a>
         </p>
       </div>
     </div>

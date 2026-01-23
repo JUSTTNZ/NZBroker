@@ -568,7 +568,7 @@ export default function SupportPage() {
 
                 {/* Typing Indicator */}
                 {isTyping && isTyping.typing && (
-                  <div className="flex justify-start">
+                  <div className="flex justify-start mb-4">
                     <div className="bg-muted text-foreground rounded-2xl rounded-bl-none px-4 py-3 max-w-[80%]">
                       <div className="flex items-center space-x-1">
                         <span className="text-sm">Support is typing</span>

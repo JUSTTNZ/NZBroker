@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Bitcoin, DollarSign, BarChart3, TrendingUp, Zap, Shield, Smartphone } from "lucide-react"
 
 export const metadata = {
-  title: "Trading - Barcrest Vault",
-  description: "Trade global markets including crypto, forex, indices, and stocks with Barcrest Vault",
+  title: "Trading - Barcrest",
+  description: "Trade global markets including crypto, forex, indices, and stocks with Barcrest",
 }
 
 export default function TradingPage() {
