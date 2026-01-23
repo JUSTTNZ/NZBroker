@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Check } from "lucide-react"
 
 export const metadata = {
-  title: "Trading Plans - AstralisX Vault",
+  title: "Trading Plans - Barcrest Capital",
   description: "Choose the right trading plan for your needs",
 }
 

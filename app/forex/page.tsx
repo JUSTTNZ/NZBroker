@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export const metadata = {
-  title: "Forex Trading - AstralisX Vault",
+  title: "Forex Trading - Barcrest Capital",
   description: "Trade major, minor, and exotic currency pairs with tight spreads",
 }
 

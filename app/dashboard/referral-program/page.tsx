@@ -6,7 +6,7 @@ import { Copy, TrendingUp, Check, Share2, Users, DollarSign } from "lucide-react
 import { useState } from "react"
 
 export default function ReferralProgramPage() {
-  const referralLink = "https://astralisx.com/ref/john123"
+  const referralLink = "https://barcrestcapital.com/ref/john123"
   const [copied, setCopied] = useState(false)
   const [showShareOptions, setShowShareOptions] = useState(false)
 
@@ -18,7 +18,7 @@ export default function ReferralProgramPage() {
 
   const shareReferral = (platform: string) => {
     let shareUrl = ""
-    const text = "Join me on AstralisX Trading Platform! Use my referral link: "
+    const text = "Join me on Barcrest Capital Trading Platform! Use my referral link: "
 
     switch (platform) {
       case "whatsapp":
@@ -28,7 +28,7 @@ export default function ReferralProgramPage() {
         shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`
         break
       case "email":
-        shareUrl = `mailto:?subject=Join me on AstralisX&body=${encodeURIComponent(text + referralLink)}`
+        shareUrl = `mailto:?subject=Join me on Barcrest Capital&body=${encodeURIComponent(text + referralLink)}`
         break
       case "twitter":
         shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text + referralLink)}`

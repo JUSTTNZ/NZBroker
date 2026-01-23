@@ -3,8 +3,8 @@ import { Footer } from "@/components/footer"
 import { Target, Handshake, Lock, Zap, Globe, Wallet, Smartphone } from "lucide-react"
 
 export const metadata = {
-  title: "About AstralisX Vault - Global Trading Platform",
-  description: "Learn about AstralisX Vault's mission, values, and commitment to traders",
+  title: "About Barcrest Capital - Global Trading Platform",
+  description: "Learn about Barcrest Capital's mission, values, and commitment to traders",
 }
 
 export default function AboutPage() {
@@ -64,7 +64,7 @@ export default function AboutPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none"></div>
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-            About AstralisX Vault
+            About Barcrest Capital
           </h1>
           <p className="text-lg text-muted-foreground">
             Empowering traders worldwide with professional-grade tools and resources
@@ -76,7 +76,7 @@ export default function AboutPage() {
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <h2 className="text-3xl font-bold mb-6">Our Story</h2>
         <p className="text-muted-foreground text-lg mb-6">
-          Founded in 2020, AstralisX Vault was created with a simple mission: to democratize access to professional
+          Founded in 2020, Barcrest Capital was created with a simple mission: to democratize access to professional
           trading tools and make global markets accessible to everyone. We believed that traders deserved better, and we
           set out to build a platform that combines institutional-grade technology with user-friendly design.
         </p>
@@ -110,7 +110,7 @@ export default function AboutPage() {
 
       {/* Why Choose Us */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
-        <h2 className="text-3xl font-bold mb-8 text-center">Why Choose AstralisX Vault?</h2>
+        <h2 className="text-3xl font-bold mb-8 text-center">Why Choose Barcrest Capital?</h2>
         <div className="grid md:grid-cols-2 gap-8">
           {features.map((feature) => {
             const IconComponent = feature.icon

@@ -25,19 +25,19 @@ export function AboutUs() {
         <Card className="glass-dark p-8 md:p-12 space-y-6 max-w-4xl mx-auto">
           <div className="space-y-6 text-foreground leading-relaxed">
             <p className="text-lg text-muted-foreground">
-              AstralisX Vault was founded with a simple mission: to democratize access to global financial markets and
+              Barcrest Capital was founded with a simple mission: to democratize access to global financial markets and
               empower traders of all skill levels to make informed decisions. Our team of experienced financial
               professionals, technologists, and market analysts has dedicated over 50 combined years to building the
               most intuitive and powerful trading platform available today.
             </p>
             <p className="text-lg text-muted-foreground">
               We believe that successful trading should be accessible, transparent, and fair. That's why we've
-              engineered every aspect of AstralisX Vault from the ground up from our low-latency execution engine to our
+              engineered every aspect of Barcrest Capital from the ground up from our low-latency execution engine to our
               institutional-grade market analysis tools to give you a competitive edge in your trading journey.
             </p>
             <p className="text-lg text-muted-foreground">
               Whether you're a seasoned institutional trader or just beginning your financial markets exploration,
-              AstralisX Vault provides the comprehensive suite of tools, market data, and education you need to succeed
+              Barcrest Capital provides the comprehensive suite of tools, market data, and education you need to succeed
               in today's dynamic global markets.
             </p>
           </div>

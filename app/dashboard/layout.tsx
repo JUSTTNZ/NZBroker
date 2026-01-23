@@ -294,7 +294,7 @@ console.log("DashboardLayout user:", user)
       {/* Customer Service Chat Icon - Fixed Position */}
       <button
         onClick={() => setShowChat(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg hover:bg-primary/90 transition-all duration-300 hover:scale-110 group"
+        className="fixed bottom-24 md:bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg hover:bg-primary/90 transition-all duration-300 hover:scale-110 group"
         aria-label="Customer Support"
       >
         <MessageCircle className="w-6 h-6 text-white" />
