@@ -88,7 +88,6 @@ export function Header() {
             href="/"
             className="flex items-center gap-3 text-xl sm:text-2xl font-bold hover:opacity-80 transition-opacity shrink-0"
           >
-            <img src="/barcrest-logo.svg" alt="Barcrest Logo" className="h-8 w-auto" />
             <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
               Barcrest
             </span>

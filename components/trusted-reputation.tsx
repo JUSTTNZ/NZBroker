@@ -39,7 +39,7 @@ export function TrustedReputation() {
         <Card className="glass-dark p-8 md:p-12 space-y-12">
           <div className="space-y-2">
             <h2 className="text-4xl md:text-5xl font-bold">Our Trusted Reputation</h2>
-            <p className="text-muted-foreground text-lg">Why traders choose AstralisX Vault</p>
+            <p className="text-muted-foreground text-lg">Why traders choose Barcrest Capital</p>
           </div>
 
           {/* Features Grid */}

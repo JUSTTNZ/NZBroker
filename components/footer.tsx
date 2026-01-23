@@ -158,7 +158,7 @@ export function Footer() {
 
         {/* Bottom */}
         <div className="border-t border-border/40 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <p>© {currentYear} AstralisX Vault. All Rights Reserved.</p>
+          <p>© {currentYear} Barcrest Capital. All Rights Reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-foreground transition-colors">
               Terms & Conditions

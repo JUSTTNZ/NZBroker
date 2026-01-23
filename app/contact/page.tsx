@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { MapPin, Clock } from "lucide-react"
 
 export const metadata = {
-  title: "Contact Us - AstralisX Vault",
-  description: "Get in touch with AstralisX Vault support team",
+  title: "Contact Us - Barcrest Capital",
+  description: "Get in touch with Barcrest Capital support team",
 }
 
 export default function ContactPage() {
@@ -79,7 +79,7 @@ export default function ContactPage() {
                 <h3 className="text-xl font-semibold">Office Location</h3>
               </div>
               <p className="text-muted-foreground">
-                AstralisX Vault
+                Barcrest Capital
                 <br />
                 123 Financial Plaza
                 <br />

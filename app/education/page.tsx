@@ -3,7 +3,7 @@ import { Footer } from "@/components/footer"
 import { BookOpen, Video, BarChart2, Users } from "lucide-react"
 
 export const metadata = {
-  title: "Education - AstralisX Vault",
+  title: "Education - Barcrest Capital",
   description: "Free trading education and learning resources for all skill levels",
 }
 

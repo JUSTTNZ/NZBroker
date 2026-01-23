@@ -99,7 +99,7 @@ export default function TradingPage() {
 
       {/* Features Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
-        <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">Why Trade with AstralisX Vault?</h2>
+        <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">Why Trade with Barcrest Capital?</h2>
         <div className="grid md:grid-cols-3 gap-8">
           <div className="p-6 rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm">
             <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center mb-4">
