@@ -5,7 +5,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
 import { useAuth } from "@/lib/auth-context" // Import your auth context
-import { useRouter,} from "next/navigation"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 // Dynamically import icons to reduce initial bundle size
 const IconComponents = {
   LayoutDashboard: dynamic(() => import("lucide-react").then(mod => mod.LayoutDashboard), { ssr: false }),
@@ -52,10 +53,13 @@ export function DashboardSidebar() {
   const [isExpanded, setIsExpanded] = useState(true)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
+  const [supportTicketCount, setSupportTicketCount] = useState(0)
   const pathname = usePathname()
-   const router = useRouter()
+  const router = useRouter()
   // Get signOut from your auth context
   const { signOut, user } = useAuth()
+  const supabase = createClient()
 
   // Set mounted state
   useEffect(() => {
@@ -98,6 +102,80 @@ export function DashboardSidebar() {
   useEffect(() => {
     setIsMobileOpen(false)
   }, [pathname])
+
+  // Fetch notification and support ticket counts
+  useEffect(() => {
+    if (!user) {
+      setNotificationCount(0)
+      setSupportTicketCount(0)
+      return
+    }
+
+    const fetchCounts = async () => {
+      try {
+        // Fetch unread notifications count
+        const { count: notifCount } = await supabase
+          .from("notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("read", false)
+
+        setNotificationCount(notifCount || 0)
+
+        // Fetch open support tickets count (tickets with responses)
+        const { count: ticketCount } = await supabase
+          .from("support_tickets")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .in("status", ["in_progress", "open"])
+
+        setSupportTicketCount(ticketCount || 0)
+      } catch (error) {
+        console.error("Error fetching sidebar counts:", error)
+      }
+    }
+
+    fetchCounts()
+
+    // Set up real-time subscription for notifications
+    const notifChannel = supabase
+      .channel('sidebar-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          fetchCounts()
+        }
+      )
+      .subscribe()
+
+    // Set up real-time subscription for support tickets
+    const ticketChannel = supabase
+      .channel('sidebar-support-tickets')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'support_tickets',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          fetchCounts()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(notifChannel)
+      supabase.removeChannel(ticketChannel)
+    }
+  }, [user, supabase])
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {
@@ -189,6 +267,14 @@ export function DashboardSidebar() {
               const IconComponent = IconComponents[link.icon as keyof typeof IconComponents]
               const active = isActive(link.href)
 
+              // Get count for specific links
+              const getCountForLink = (href: string) => {
+                if (href === "/dashboard/notifications") return notificationCount
+                if (href === "/dashboard/support") return supportTicketCount
+                return 0
+              }
+              const count = getCountForLink(link.href)
+
               return (
                 <Link
                   key={link.href}
@@ -205,9 +291,14 @@ export function DashboardSidebar() {
                   ) : (
                     <IconFallback />
                   )}
-                  <span className="text-sm font-medium truncate">
+                  <span className="text-sm font-medium truncate flex-1">
                     {link.label}
                   </span>
+                  {count > 0 && (
+                    <span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold flex-shrink-0">
+                      {count > 9 ? "9+" : count}
+                    </span>
+                  )}
                 </Link>
               )
             })}

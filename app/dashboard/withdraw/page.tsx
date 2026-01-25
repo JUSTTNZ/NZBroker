@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building, Wallet, Copy, Check, Loader2, Shield, AlertTriangle, ArrowRightLeft } from "lucide-react"
+import { Building, Wallet, Copy, Check, Loader2, Shield, AlertTriangle, ArrowRightLeft, Mail } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+
+const supportEmail = "support@barcrestcapital.com"
 
 export default function WithdrawPage() {
   const { user, currentWallet, userProfile, refreshAllData, switchAccountType } = useAuth()
@@ -569,6 +571,28 @@ export default function WithdrawPage() {
               <span className="text-xs text-blue-500">4</span>
             </div>
             <p>Funds will be deducted from your Total Available Balance immediately</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Customer Support Card */}
+      <Card className="p-6 bg-primary/5 border-primary/20">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Mail className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground mb-1">Need Help with Your Withdrawal?</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              If you have any questions or issues with your withdrawal request, please contact our support team.
+            </p>
+            <a
+              href={`mailto:${supportEmail}`}
+              className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-semibold text-sm transition-colors"
+            >
+              <Mail className="w-4 h-4" />
+              {supportEmail}
+            </a>
           </div>
         </div>
       </Card>
