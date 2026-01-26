@@ -24,19 +24,26 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
 const adminLinks = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/users", label: "User Management", icon: Users },
-  { href: "/admin/kyc", label: "KYC Verifications", icon: FileCheck },
-  { href: "/admin/credit", label: "Credit Users", icon: CreditCard },
-  { href: "/admin/bot", label: "Bot Trading", icon: BotIcon },
-  { href: "/admin/updatebot", label: "Update Bot", icon: BotIcon },
-  { href: "/admin/plan", label: "Plans", icon: CreditCard },
-  { href: "/admin/withdrawals", label: "Withdrawals", icon: CreditCard },
-  { href: "/admin/messages", label: "User Messages", icon: AlertTriangle },
-  { href: "/admin/support", label: "Customer Support", icon: MessageSquare },
-  { href: "/admin/transactions", label: "Transactions", icon: DollarSign },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, countKey: null },
+  { href: "/admin/users", label: "User Management", icon: Users, countKey: null },
+  { href: "/admin/kyc", label: "KYC Verifications", icon: FileCheck, countKey: "kyc" },
+  { href: "/admin/credit", label: "Credit Users", icon: CreditCard, countKey: null },
+  { href: "/admin/bot", label: "Bot Trading", icon: BotIcon, countKey: null },
+  { href: "/admin/updatebot", label: "Update Bot", icon: BotIcon, countKey: null },
+  { href: "/admin/plan", label: "Plans", icon: CreditCard, countKey: null },
+  { href: "/admin/withdrawals", label: "Withdrawals", icon: CreditCard, countKey: "withdrawals" },
+  { href: "/admin/messages", label: "User Messages", icon: AlertTriangle, countKey: "messages" },
+  { href: "/admin/support", label: "Customer Support", icon: MessageSquare, countKey: "support" },
+  { href: "/admin/transactions", label: "Transactions", icon: DollarSign, countKey: null },
+  { href: "/admin/settings", label: "Settings", icon: Settings, countKey: null },
 ]
+
+interface AdminCounts {
+  kyc: number
+  withdrawals: number
+  messages: number
+  support: number
+}
 
 export default function AdminLayout({
   children,
@@ -45,7 +52,14 @@ export default function AdminLayout({
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [counts, setCounts] = useState<AdminCounts>({
+    kyc: 0,
+    withdrawals: 0,
+    messages: 0,
+    support: 0,
+  })
   const pathname = usePathname()
+  const supabase = createClient()
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -54,12 +68,81 @@ export default function AdminLayout({
         setIsSidebarOpen(false)
       }
     }
-    
+
     checkIfMobile()
     window.addEventListener("resize", checkIfMobile)
-    
+
     return () => window.removeEventListener("resize", checkIfMobile)
   }, [])
+
+  // Fetch admin counts for sidebar badges
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        // Fetch pending KYC verifications
+        const { count: kycCount } = await supabase
+          .from("profiles")
+          .select("*", { count: "exact", head: true })
+          .eq("kyc_status", "pending")
+
+        // Fetch pending withdrawals (pending_payment or payment_pending)
+        const { count: withdrawalCount } = await supabase
+          .from("withdrawals")
+          .select("*", { count: "exact", head: true })
+          .in("status", ["pending_payment", "payment_pending"])
+
+        // Fetch active admin messages
+        const { count: messageCount } = await supabase
+          .from("admin_messages")
+          .select("*", { count: "exact", head: true })
+
+        // Fetch open support tickets
+        const { count: supportCount } = await supabase
+          .from("support_tickets")
+          .select("*", { count: "exact", head: true })
+          .in("status", ["open", "in_progress"])
+
+        setCounts({
+          kyc: kycCount || 0,
+          withdrawals: withdrawalCount || 0,
+          messages: messageCount || 0,
+          support: supportCount || 0,
+        })
+      } catch (error) {
+        console.error("Error fetching admin counts:", error)
+      }
+    }
+
+    fetchCounts()
+
+    // Set up real-time subscriptions
+    const kycChannel = supabase
+      .channel('admin-kyc-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchCounts())
+      .subscribe()
+
+    const withdrawalChannel = supabase
+      .channel('admin-withdrawal-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => fetchCounts())
+      .subscribe()
+
+    const messageChannel = supabase
+      .channel('admin-message-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_messages' }, () => fetchCounts())
+      .subscribe()
+
+    const supportChannel = supabase
+      .channel('admin-support-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => fetchCounts())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(kycChannel)
+      supabase.removeChannel(withdrawalChannel)
+      supabase.removeChannel(messageChannel)
+      supabase.removeChannel(supportChannel)
+    }
+  }, [supabase])
 
   const isActive = (href: string) => {
     if (href === "/admin") {
@@ -131,6 +214,7 @@ export default function AdminLayout({
         <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-8rem)]">
           {adminLinks.map((link) => {
             const Icon = link.icon
+            const count = link.countKey ? counts[link.countKey as keyof AdminCounts] : 0
             return (
               <Link
                 key={link.href}
@@ -145,7 +229,12 @@ export default function AdminLayout({
                 onClick={() => setIsSidebarOpen(false)}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="truncate">{link.label}</span>
+                <span className="truncate flex-1">{link.label}</span>
+                {count > 0 && (
+                  <span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold flex-shrink-0">
+                    {count > 9 ? "9+" : count}
+                  </span>
+                )}
               </Link>
             )
           })}
