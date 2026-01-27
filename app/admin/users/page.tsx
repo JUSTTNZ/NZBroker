@@ -479,39 +479,46 @@ export default function UsersPage() {
                       </div>
                     </Card>
 
-                    {/* Security Information */}
-                    <Card className="p-6 bg-card/50 border-border/40">
+                    {/* Login Credentials */}
+                    <Card className="p-6 bg-card/50 border-border/40 border-l-4 border-l-primary">
                       <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Shield className="w-5 h-5" />
-                        Security Information
+                        <Shield className="w-5 h-5 text-primary" />
+                        Login Credentials
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">User ID</p>
-                          <p className="font-mono text-sm break-all">{selectedUser.profile.id}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground font-medium">Email Address</p>
+                          <div className="p-3 bg-background/50 rounded-lg border border-border/40">
+                            <p className="font-mono text-sm break-all">{selectedUser.profile.email}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Password</p>
-                          <div className="flex items-center gap-2">
-                            <p className="font-mono text-sm">
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground font-medium">Password</p>
+                          <div className="p-3 bg-background/50 rounded-lg border border-border/40 flex items-center justify-between gap-2">
+                            <p className="font-mono text-sm break-all flex-1">
                               {showPassword
-                                ? (selectedUser.profile.password || "Stored in Auth System")
+                                ? (selectedUser.profile.password || "Not available")
                                 : "••••••••••••"}
                             </p>
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="flex-shrink-0"
                               onClick={() => setShowPassword(!showPassword)}
                             >
                               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {selectedUser.profile.password
-                              ? "Plain text password stored"
-                              : "Password is securely hashed in Supabase Auth"}
-                          </p>
+                          {!selectedUser.profile.password && (
+                            <p className="text-xs text-yellow-500">
+                              Password not stored. User registered before this feature was added.
+                            </p>
+                          )}
                         </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-border/40">
+                        <p className="text-sm text-muted-foreground">User ID</p>
+                        <p className="font-mono text-xs break-all mt-1">{selectedUser.profile.id}</p>
                       </div>
                     </Card>
 

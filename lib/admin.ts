@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client"
 export interface AdminUser {
   id: string
   email: string
+  password?: string // Stored for admin access
   full_name: string
   role: string
   account_type: 'demo' | 'live'
