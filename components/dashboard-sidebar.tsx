@@ -184,6 +184,18 @@ export function DashboardSidebar() {
     return pathname.startsWith(href)
   }
 
+  // Handle click on sidebar links - clear counts immediately for better UX
+  const handleLinkClick = (href: string) => {
+    setIsMobileOpen(false)
+
+    // Immediately clear counts when user clicks on the link
+    if (href === "/dashboard/notifications") {
+      setNotificationCount(0)
+    } else if (href === "/dashboard/support") {
+      setSupportTicketCount(0)
+    }
+  }
+
   // Handle sign out - fast, no awaiting
   const handleSignOut = () => {
     setIsMobileOpen(false)
@@ -217,7 +229,7 @@ export function DashboardSidebar() {
 
       {/* Sidebar - Optimized */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-[90] flex flex-col ${
+        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-[90] flex flex-col overflow-hidden ${
           // Always expanded width on mobile when open
           isMobileOpen || isExpanded ? "w-64" : "w-20"
         } ${
@@ -275,26 +287,32 @@ export function DashboardSidebar() {
               }
               const count = getCountForLink(link.href)
 
+              // Only show count badge when sidebar is visible (expanded on desktop or open on mobile)
+              const showBadge = count > 0 && (isMobileOpen || isExpanded)
+
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group relative ${
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   } justify-start`}
-                  onClick={() => setIsMobileOpen(false)}
+                  onClick={() => handleLinkClick(link.href)}
                 >
-                  {IconComponent ? (
-                    <IconComponent className="w-5 h-5 flex-shrink-0" />
-                  ) : (
-                    <IconFallback />
-                  )}
+                  <div className="relative flex-shrink-0">
+                    {IconComponent ? (
+                      <IconComponent className="w-5 h-5" />
+                    ) : (
+                      <IconFallback />
+                    )}
+                  </div>
                   <span className="text-sm font-medium truncate flex-1">
                     {link.label}
                   </span>
-                  {count > 0 && (
+                  {/* Expanded state: show badge at end of link */}
+                  {showBadge && (
                     <span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold flex-shrink-0">
                       {count > 9 ? "9+" : count}
                     </span>
