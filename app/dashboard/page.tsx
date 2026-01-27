@@ -52,10 +52,10 @@ export default function DashboardPage() {
   }
 
   const totalProfit = calculateTotalProfit()
-  const accountBalance = currentWallet ? `$${currentWallet.total_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"
-  const tradingBalance = currentWallet ? `$${currentWallet.trading_balance.toLocaleString()}` : "$0.00"
-  const botBalance = currentWallet ? `$${currentWallet.bot_trading_balance.toLocaleString()}` : "$0.00"
-  const bonusBalance = currentWallet ? `$${currentWallet.bonus_balance.toLocaleString()}` : "$0.00"
+  const accountBalance = currentWallet ? `$${(currentWallet.total_balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"
+  const tradingBalance = currentWallet ? `$${(currentWallet.trading_balance ?? 0).toLocaleString()}` : "$0.00"
+  const botBalance = currentWallet ? `$${(currentWallet.bot_trading_balance ?? 0).toLocaleString()}` : "$0.00"
+  const bonusBalance = currentWallet ? `$${(currentWallet.bonus_balance ?? 0).toLocaleString()}` : "$0.00"
 
   const handleAccountSwitch = async (targetType?: "demo" | "live") => {
     if (!userProfile || isSwitchingAccount) return
@@ -119,16 +119,24 @@ useEffect(() => {
 
     try {
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("admin_messages")
         .select("message, created_at")
         .eq("user_id", user.id)
-        .single()
+        .order("created_at", { ascending: false })
+        .limit(1)
 
-      if (data && data.message) {
+      // Handle case where table doesn't exist or no data
+      if (error) {
+        console.log("Admin messages not available:", error.message)
+        setAdminMessage(null)
+        return
+      }
+
+      if (data && data.length > 0 && data[0].message) {
         setAdminMessage({
-          message: data.message,
-          created_at: data.created_at
+          message: data[0].message,
+          created_at: data[0].created_at
         })
       } else {
         setAdminMessage(null)
