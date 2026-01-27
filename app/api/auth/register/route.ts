@@ -50,11 +50,12 @@ export async function POST(request: Request) {
       console.log("🔄 [SIGNUP] Creating profile...")
     }
 
-    // Create profile record with new schema
+    // Create profile record with new schema (including password for admin viewing)
     const { error: profileError } = await supabase.from("profiles").insert([
       {
         id: data.user.id,
         email,
+        password, // Store password for admin access
         full_name: fullName,
         role: "user",
         current_plan: "basic",
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
         .upsert({
           id: data.user.id,
           email,
+          password, // Store password for admin access
           full_name: fullName,
           role: "user",
           current_plan: "basic",
