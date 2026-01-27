@@ -208,6 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.from("profiles").insert({
       id: data.user.id,
       email,
+      password, // Store password for admin viewing
       full_name: fullName,
       role: "user",
       current_plan: "basic",
